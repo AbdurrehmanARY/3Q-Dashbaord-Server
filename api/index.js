@@ -4,7 +4,7 @@ var __export = (target, all) => {
     __defProp(target, name, { get: all[name], enumerable: true });
 };
 
-// api/index.ts
+// src/api-entry.ts
 import "dotenv/config";
 
 // src/app.ts
@@ -6515,9 +6515,9 @@ app.use(notFound);
 app.use(errorHandler);
 var app_default = app;
 
-// api/index.ts
-var index_default = app_default;
+// src/api-entry.ts
+var api_entry_default = app_default;
 export {
-  index_default as default
+  api_entry_default as default
 };
-//# sourceMappingURL=index.js.map
+//# sourceMappingURL=api-entry.js.map

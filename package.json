@@ -11,7 +11,7 @@
     "dev": "tsx watch --env-file .env src/index.ts",
     "development": "tsx watch --env-file .env src/index.ts",
     "production": "npm run build && node --env-file .env.production dist/index.js",
-    "build": "tsc --noEmit && tsup && tsup api/index.ts --format esm --out-dir api --no-clean",
+    "build": "tsc --noEmit && tsup && tsup src/api-entry.ts --format esm --out-dir api --no-clean && node -e \"import('fs').then(fs => fs.renameSync('api/api-entry.js', 'api/index.js'))\"",
     "start": "node --env-file .env dist/index.js",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
