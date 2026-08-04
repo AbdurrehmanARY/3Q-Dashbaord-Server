@@ -1,0 +1,111 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1784612659641,
+      "tag": "0000_lovely_imperial_guard",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1784633628098,
+      "tag": "0001_master_data_fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784638262335,
+      "tag": "0002_production_orders_and_users",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1784701847583,
+      "tag": "0003_drop_legacy_production_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1784701869399,
+      "tag": "0004_production_roll_issuances",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1784705764678,
+      "tag": "0005_purchase_total_roll_per_200m",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1784707714468,
+      "tag": "0006_widen_weight_precision",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1784723989932,
+      "tag": "0007_row_update_event_type",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1784732091008,
+      "tag": "0008_modules_refactor_add",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1784732236589,
+      "tag": "0009_drop_is_submitted",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1784797437204,
+      "tag": "0010_easy_killer_shrike",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1784797437205,
+      "tag": "0011_rename_item_code_to_material_code",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1785496085028,
+      "tag": "0012_flawless_master_chief",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1785501726962,
+      "tag": "0013_busy_prodigy",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1785749277816,
+      "tag": "0014_last_meteorite",
+      "breakpoints": true
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+ALTER TYPE "public"."production_event_type" ADD VALUE 'row_update';

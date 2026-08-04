@@ -1,0 +1,1 @@
+ALTER TABLE "purchase_records" ADD COLUMN "total_roll_per_200m" numeric(12, 2);
