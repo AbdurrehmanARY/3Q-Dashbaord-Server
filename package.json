@@ -5,13 +5,13 @@
   "type": "module",
   "main": "dist/index.js",
   "engines": {
-    "node": "20.x"
+    "node": "24.x"
   },
   "scripts": {
     "dev": "tsx watch --env-file .env src/index.ts",
     "development": "tsx watch --env-file .env src/index.ts",
     "production": "npm run build && node --env-file .env.production dist/index.js",
-    "build": "tsc --noEmit && tsup",
+    "build": "tsc --noEmit && tsup && tsup api/index.ts --format esm --out-dir api --no-clean",
     "start": "node --env-file .env dist/index.js",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
