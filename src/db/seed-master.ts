@@ -23,7 +23,7 @@ import {
   productionOrderLines,
 } from "@db/schema";
 import { calculateTotalRollPer200m, calculateInvoiceWeight } from "@api/utils/purchase-formula";
-import { MATERIALS, OPERATORS, MACHINES, SAMPLE_COMPANIES, USERS, VENDORS } from "./seed-data";
+import { MATERIALS, OPERATORS, MACHINES, COMPANIES, USERS, VENDORS, PURCHASE_SEEDS } from "./seed-data";
 
 const round4 = (n: number) => Math.round(n * 10000) / 10000;
 
@@ -72,30 +72,31 @@ async function seedMaterials() {
   const weights = fillWeights(MATERIALS);
   const estimated = MATERIALS.filter((m) => m.weight == null || m.weight <= 0).length;
 
-  for (const row of MATERIALS) {
-    const weight = String(weights.get(row.code)!);
-    await db
-      .insert(materials)
-      .values({
-        code: row.code,
-        type: row.type,
-        description: row.description,
-        weightPerRoll: weight,
-      })
-      .onConflictDoUpdate({
-        target: materials.code,
-        set: {
+  await Promise.all(
+    MATERIALS.map((row) => {
+      const weight = String(weights.get(row.code)!);
+      return db
+        .insert(materials)
+        .values({
+          code: row.code,
           type: row.type,
           description: row.description,
-          // Never downgrade a weight the user already entered to a placeholder.
-          weightPerRoll:
-            row.weight != null && row.weight > 0
-              ? weight
-              : sql`greatest(${materials.weightPerRoll}, ${weight})`,
-          updatedAt: new Date(),
-        },
-      });
-  }
+          weightPerRoll: weight,
+        })
+        .onConflictDoUpdate({
+          target: materials.code,
+          set: {
+            type: row.type,
+            description: row.description,
+            weightPerRoll:
+              row.weight != null && row.weight > 0
+                ? weight
+                : sql`greatest(${materials.weightPerRoll}, ${weight})`,
+            updatedAt: new Date(),
+          },
+        });
+    })
+  );
   console.log(`materials      ${MATERIALS.length} upserted (${estimated} weights estimated)`);
 }
 
@@ -225,31 +226,33 @@ async function seedUsers() {
 
 async function seedCompanies() {
   let brandCount = 0;
-  for (const row of SAMPLE_COMPANIES) {
-    const [company] = await db
-      .insert(companies)
-      .values({
-        name: row.name,
-        email: row.email,
-        location: row.location,
-        contactPerson: row.contactPerson,
-        phone: row.phone,
-      })
-      .onConflictDoUpdate({
-        target: companies.name,
-        set: { email: row.email, location: row.location, contactPerson: row.contactPerson, phone: row.phone },
-      })
-      .returning();
+  await Promise.all(
+    COMPANIES.map(async (row) => {
+      const [company] = await db
+        .insert(companies)
+        .values({
+          name: row.name,
+          email: row.email,
+          location: row.location,
+          contactPerson: row.contactPerson,
+          phone: row.phone,
+        })
+        .onConflictDoUpdate({
+          target: companies.name,
+          set: { email: row.email, location: row.location, contactPerson: row.contactPerson, phone: row.phone },
+        })
+        .returning();
 
-    for (const brandName of row.brands) {
-      await db
-        .insert(brands)
-        .values({ companyId: company.id, name: brandName })
-        .onConflictDoNothing();
-      brandCount += 1;
-    }
-  }
-  console.log(`companies      ${SAMPLE_COMPANIES.length} upserted with ${brandCount} brands (SAMPLE data)`);
+      for (const brandName of row.brands) {
+        await db
+          .insert(brands)
+          .values({ companyId: company.id, name: brandName })
+          .onConflictDoNothing();
+        brandCount += 1;
+      }
+    })
+  );
+  console.log(`companies      ${COMPANIES.length} upserted with ${brandCount} brands`);
 }
 
 /**
@@ -280,89 +283,57 @@ async function seedStock() {
   const materialRows = await db.select().from(materials);
   const weightByCode = new Map(materialRows.map((m) => [m.code, m.weightPerRoll]));
 
-  const existingPurchases = await db
-    .select({ materialCode: purchaseRecords.materialCode, vendor: purchaseRecords.vendor })
-    .from(purchaseRecords);
-  const existingRolls = await db
-    .select({ materialCode: inventoryRolls.materialCode })
-    .from(inventoryRolls);
-  const alreadyStocked = new Set(existingRolls.map((r) => r.materialCode));
+  // Remove existing purchases and stock ledgers per user request
+  await db.delete(purchaseRecords);
+  await db.delete(inventoryRolls);
 
   let purchases = 0;
-  let ledgers = 0;
+  const stockByCode = new Map<string, number>();
 
-  for (const [index, row] of STOCKED.entries()) {
-    const vendor = VENDORS[index % VENDORS.length];
-    // Skip anything already recorded so re-runs don't inflate stock.
-    if (existingPurchases.some((p) => p.materialCode === row.code && p.vendor === vendor)) continue;
-
-    const totalRoll = row.cartons * row.perCarton;
-    const material = materialRows.find((m) => m.code === row.code);
-    if (!material) continue;
-
-    const reportDate = new Date(Date.now() - (index + 1) * 5 * 86400000).toISOString().slice(0, 10);
+  for (const row of PURCHASE_SEEDS) {
+    const material = materialRows.find((m) => m.code === row.materialCode);
+    const mType = material?.type ?? "Roll";
 
     await db.insert(purchaseRecords).values({
-      reportDate,
-      materialCode: row.code,
-      materialType: material.type,
-      itemName: material.description ?? row.code,
-      invoiceNumber: `INV-2026-${String(1000 + index)}`,
-      gdNumber: `GD-${String(48000 + index)}`,
-      vendor,
-      cartonQty: row.cartons,
-      rollsPerCarton: row.perCarton,
-      totalRoll: String(totalRoll),
+      reportDate: row.reportDate,
+      materialCode: row.materialCode,
+      materialType: mType,
+      itemName: row.itemName,
+      invoiceNumber: row.invoiceNumber,
+      gdNumber: row.gdNumber,
+      vendor: row.vendor,
+      cartonQty: row.cartonQty,
+      rollsPerCarton: row.rollsPerCarton,
+      totalRoll: String(row.totalRoll),
       rollLength: String(row.rollLength),
       netWeight: String(row.netWeight),
-      totalRollPer200m: String(calculateTotalRollPer200m(totalRoll, row.rollLength)),
-      invoiceWeight: String(calculateInvoiceWeight(row.netWeight, totalRoll, row.rollLength)),
-      localWeight: weightByCode.get(row.code) ?? "0",
+      totalRollPer200m: String(row.totalRollPer200m),
+      invoiceWeight: String(row.invoiceWeight),
+      localWeight: String(row.localWeight),
+      efs: row.isEfs ? "yes" : "no",
     });
     purchases += 1;
 
-    // Purchases credit stock — same effect as the runtime transactional path.
-    if (alreadyStocked.has(row.code)) {
-      await db
-        .update(inventoryRolls)
-        .set({
-          receivedRolls: sql`${inventoryRolls.receivedRolls} + ${totalRoll}`,
-          balanceRolls: sql`${inventoryRolls.balanceRolls} + ${totalRoll}`,
-          rollPerKg: String(row.rollPerKg),
-          updatedAt: new Date(),
-        })
-        .where(eq(inventoryRolls.materialCode, row.code));
-    } else {
-      await db.insert(inventoryRolls).values({
-        materialCode: row.code,
-        openingStock: "0",
-        receivedRolls: String(totalRoll),
-        issuedRolls: "0",
-        balanceRolls: String(totalRoll),
-        rollPerKg: String(row.rollPerKg),
-      });
-      ledgers += 1;
-    }
+    stockByCode.set(row.materialCode, (stockByCode.get(row.materialCode) ?? 0) + row.totalRoll);
   }
-  // Any ledger still on the 0 default gets the physically-implied figure, so Per SKU
-  // Balance (balanceRolls × rollPerKg) is meaningful on every row rather than reading 0.
-  const backfilled = await db
-    .update(inventoryRolls)
-    .set({
-      rollPerKg: sql`round(1 / ${materials.weightPerRoll}, 4)`,
-      updatedAt: new Date(),
-    })
-    .from(materials)
-    .where(
-      sql`${materials.code} = ${inventoryRolls.materialCode}
-          and ${inventoryRolls.rollPerKg} = 0
-          and ${materials.weightPerRoll} > 0`
-    )
-    .returning({ code: inventoryRolls.materialCode });
 
-  console.log(
-    `purchases      ${purchases} created, ${ledgers} new stock ledger(s), ${backfilled.length} rollPerKg backfilled`
-  );
+  let ledgers = 0;
+  for (const [code, totalRolls] of stockByCode.entries()) {
+    const weightPerRoll = Number(weightByCode.get(code) ?? 0.5);
+    const rollPerKg = weightPerRoll > 0 ? round4(1 / weightPerRoll) : 1;
+
+    await db.insert(inventoryRolls).values({
+      materialCode: code,
+      openingStock: "0",
+      receivedRolls: String(totalRolls),
+      issuedRolls: "0",
+      balanceRolls: String(totalRolls),
+      rollPerKg: String(rollPerKg),
+    });
+    ledgers += 1;
+  }
+
+  console.log(`purchases      ${purchases} created, ${ledgers} stock ledger(s) created`);
 }
 
 /** Sample sales orders across the sample brands, including two dispatched/locked ones. */

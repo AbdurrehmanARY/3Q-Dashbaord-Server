@@ -1,4 +1,4 @@
-import { pgTable, serial, integer, varchar, numeric, timestamp, index } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, varchar, numeric, jsonb, timestamp, index } from "drizzle-orm/pg-core";
 import { workOrders } from "./work-orders.table";
 
 /**
@@ -30,6 +30,8 @@ export const wovenWorkOrderDetails = pgTable(
     density: integer("density").notNull(),
     /** Extra allowance added on top of the ordered quantity, e.g. 150. */
     extra: numeric("extra", { precision: 12, scale: 2 }).default("0").notNull(),
+    /** Size labels woven on this order, e.g. ["10", "12", "XL", "34/34"]. */
+    sizeLabels: jsonb("size_labels").$type<string[]>().default([]).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },

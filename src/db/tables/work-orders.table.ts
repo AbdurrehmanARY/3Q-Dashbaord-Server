@@ -43,6 +43,17 @@ export const workOrders = pgTable(
     imageUrl: text("image_url"),
     status: workOrderStatusEnum("status").default("initiate_production").notNull(),
     /**
+     * Scheduling priority, set by office staff on any order (woven or printed).
+     * Stored as a plain varchar (not a pg enum) so the value set is easy to extend —
+     * validated to `normal | urgent | emergency` by the Zod schema. Default `normal`.
+     */
+    priority: varchar("priority", { length: 20 }).default("normal").notNull(),
+    /**
+     * Why this order exists. Validated to
+     * `normal order | shortfall | additional order | recut order`. Default `normal order`.
+     */
+    orderType: varchar("order_type", { length: 30 }).default("normal order").notNull(),
+    /**
      * Which manufacturing workflow this order runs through. Defaults to `printed`, so every
      * pre-existing row keeps its current behaviour untouched. Woven orders additionally
      * carry a `woven_work_order_details` row with the loom specification.

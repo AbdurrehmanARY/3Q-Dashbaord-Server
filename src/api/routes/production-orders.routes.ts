@@ -10,6 +10,7 @@ import {
   transferRollsSchema,
   issueRollsSchema,
   updateLineFullSchema,
+  reconcileLineSchema,
 } from "@api/validations/production-orders.validation";
 import { listProductionOrdersQuerySchema } from "@api/validations/query.validation";
 import { idParamsSchema, lineIdParamsSchema, paginationQuerySchema } from "@api/validations/common.validation";
@@ -42,6 +43,14 @@ router.patch(
   validateParams(lineIdParamsSchema),
   validateRequest(updateLineFullSchema),
   productionOrderController.updateLineFull
+);
+
+/* --- Stock reconciliation after production complete --- */
+router.put(
+  "/lines/:lineId/reconcile",
+  validateParams(lineIdParamsSchema),
+  validateRequest(reconcileLineSchema),
+  productionOrderController.reconcileLine
 );
 
 /* --- Phases 4, 6 & 8: assignment and cumulative progress --- */

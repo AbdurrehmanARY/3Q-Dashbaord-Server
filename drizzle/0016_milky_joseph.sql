@@ -1,0 +1,1 @@
+ALTER TABLE "thread_dyeing_allocations" ADD COLUMN IF NOT EXISTS "received_weight" numeric(14, 3);

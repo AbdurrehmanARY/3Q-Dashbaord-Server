@@ -5,6 +5,7 @@ const planLineSchema = z.object({
   labelType: z.string().trim().min(1, "Label type is required"),
   quantity: z.coerce.number().positive("Quantity must be greater than zero"),
   labelSize: z.coerce.number().positive("Label size must be greater than zero"),
+  rollLength: z.coerce.number().positive("Roll length must be greater than zero").optional(),
   extraRolls: z.coerce.number().min(0, "Extra rolls cannot be negative").optional(),
   /* Reserved on submit, so all three are required — see production-order.service.ts. */
   materialCode: z.string().trim().min(1, "Material is required"),
@@ -26,6 +27,7 @@ export const createProductionOrderSchema = z.object({
 export const updateProductionOrderSchema = z.object({
   body: z.object({
     notes: z.string().optional(),
+    status: z.enum(["planned", "production", "complete"]).optional(),
   }),
 });
 
@@ -98,11 +100,26 @@ export const updateLineFullSchema = z.object({
     cuttingMachineId: z.coerce.number().int().positive().nullable().optional(),
     cuttingOperatorId: z.coerce.number().int().positive().nullable().optional(),
     packagingOperatorId: z.coerce.number().int().positive().nullable().optional(),
+    usedRolls: z.coerce.number().min(0, "Cannot be negative").optional(),
+    usedWeight: z.coerce.number().min(0, "Cannot be negative").optional(),
+    extraRollsReturned: z.coerce.number().min(0, "Cannot be negative").optional(),
+    extraWeight: z.coerce.number().min(0, "Cannot be negative").optional(),
     note: z.string().optional(),
     actorUserId: z.coerce.number().int().positive().optional(),
   }),
 });
 
+export const reconcileLineSchema = z.object({
+  body: z.object({
+    usedRolls: z.coerce.number().min(0, "Used rolls cannot be negative"),
+    usedWeight: z.coerce.number().min(0, "Used weight cannot be negative"),
+    extraRollsReturned: z.coerce.number().min(0, "Extra rolls returned cannot be negative"),
+    extraWeight: z.coerce.number().min(0, "Extra weight cannot be negative"),
+    actorUserId: z.coerce.number().int().positive().optional(),
+  }),
+});
+
+export type ReconcileLineDTO = z.infer<typeof reconcileLineSchema>["body"];
 export type UpdateLineFullDTO = z.infer<typeof updateLineFullSchema>["body"];
 export type IssueRollsDTO = z.infer<typeof issueRollsSchema>["body"];
 export type CreateProductionOrderDTO = z.infer<typeof createProductionOrderSchema>["body"];

@@ -5,6 +5,7 @@ import {
   productionStageEvents,
   productionRollIssuances,
   inventoryRolls,
+  inventoryRollMovements,
   workOrders,
   brands,
   companies,
@@ -82,6 +83,7 @@ const productionOrderSelect = {
   orderDate: workOrders.orderDate,
   dueDate: workOrders.dueDate,
   salesOrderQty: workOrders.totalQty,
+  priority: workOrders.priority,
   /** Which workflow this order runs — the dashboard branches on it. */
   productType: workOrders.productType,
   brandId: brands.id,
@@ -110,7 +112,7 @@ export class ProductionOrderRepository {
     if (filters?.poNumber) conditions.push(sql`${workOrders.poNumber} ILIKE ${"%" + filters.poNumber + "%"}`);
     if (filters?.workOrderId) conditions.push(eq(productionOrders.workOrderId, filters.workOrderId));
 
-    return db
+    const orders = await db
       .select(productionOrderSelect)
       .from(productionOrders)
       .innerJoin(workOrders, eq(productionOrders.workOrderId, workOrders.id))
@@ -118,6 +120,49 @@ export class ProductionOrderRepository {
       .leftJoin(companies, eq(brands.companyId, companies.id))
       .where(conditions.length > 0 ? and(...conditions) : undefined)
       .orderBy(desc(productionOrders.createdAt));
+
+    if (orders.length === 0) return [];
+
+    const orderIds = orders.map((o) => o.id);
+    const lineData = await db
+      .select({
+        productionOrderId: productionOrderLines.productionOrderId,
+        printingMachineId: productionOrderLines.printingMachineId,
+        cuttingMachineId: productionOrderLines.cuttingMachineId,
+        quantity: productionOrderLines.quantity,
+      })
+      .from(productionOrderLines)
+      .where(inArray(productionOrderLines.productionOrderId, orderIds));
+
+    const allMachinesList = await db.select({ id: machines.id, name: machines.name }).from(machines);
+    const machineById = new Map(allMachinesList.map((m) => [m.id, m.name]));
+
+    const machineMap = new Map<number, Set<string>>();
+    const plannedQtyMap = new Map<number, number>();
+
+    for (const lm of lineData) {
+      if (!machineMap.has(lm.productionOrderId)) {
+        machineMap.set(lm.productionOrderId, new Set<string>());
+      }
+      const set = machineMap.get(lm.productionOrderId)!;
+      if (lm.printingMachineId && machineById.has(lm.printingMachineId)) {
+        set.add(machineById.get(lm.printingMachineId)!);
+      }
+      if (lm.cuttingMachineId && machineById.has(lm.cuttingMachineId)) {
+        set.add(machineById.get(lm.cuttingMachineId)!);
+      }
+
+      const prevPlanned = plannedQtyMap.get(lm.productionOrderId) || 0;
+      plannedQtyMap.set(lm.productionOrderId, prevPlanned + Number(lm.quantity || 0));
+    }
+
+    return orders.map((order) => {
+      const set = machineMap.get(order.id);
+      const machineName = set && set.size > 0 ? Array.from(set).join(", ") : null;
+      const plannedQty = plannedQtyMap.get(order.id) || 0;
+      const unplannedQty = Math.max(0, Number(order.totalQty || 0) - plannedQty);
+      return { ...order, machineName, plannedQty, unplannedQty };
+    });
   }
 
   async findById(id: number | string) {
@@ -128,7 +173,31 @@ export class ProductionOrderRepository {
       .leftJoin(brands, eq(workOrders.brandId, brands.id))
       .leftJoin(companies, eq(brands.companyId, companies.id))
       .where(eq(productionOrders.id, Number(id)));
-    return row;
+    if (!row) return undefined;
+
+    const rawLines = await db
+      .select({
+        printingMachineId: productionOrderLines.printingMachineId,
+        cuttingMachineId: productionOrderLines.cuttingMachineId,
+      })
+      .from(productionOrderLines)
+      .where(eq(productionOrderLines.productionOrderId, Number(id)));
+
+    const allMachinesList = await db.select({ id: machines.id, name: machines.name }).from(machines);
+    const machineById = new Map(allMachinesList.map((m) => [m.id, m.name]));
+
+    const set = new Set<string>();
+    for (const l of rawLines) {
+      if (l.printingMachineId && machineById.has(l.printingMachineId)) {
+        set.add(machineById.get(l.printingMachineId)!);
+      }
+      if (l.cuttingMachineId && machineById.has(l.cuttingMachineId)) {
+        set.add(machineById.get(l.cuttingMachineId)!);
+      }
+    }
+    const machineName = set.size > 0 ? Array.from(set).join(", ") : null;
+
+    return { ...row, machineName };
   }
 
   async findRawById(id: number | string) {
@@ -748,6 +817,7 @@ export class ProductionOrderRepository {
         orderDate: workOrders.orderDate,
         dueDate: workOrders.dueDate,
         totalQty: workOrders.totalQty,
+        productType: workOrders.productType,
         brandId: brands.id,
         brandName: brands.name,
         companyId: companies.id,
@@ -763,6 +833,83 @@ export class ProductionOrderRepository {
         )
       )
       .orderBy(desc(workOrders.createdAt));
+  }
+
+  /**
+   * Reconciles stock for a finished production line:
+   * Records usedRolls, usedWeight, extraRollsReturned, extraWeight, and reconciledAt.
+   * Automatically credits extraRollsReturned rolls back to main inventory (inventory_rolls)
+   * and writes an append-only inventory_roll_movements history entry.
+   */
+  async reconcileLineStockTransaction(
+    lineId: number,
+    data: {
+      usedRolls: number;
+      usedWeight: number;
+      extraRollsReturned: number;
+      extraWeight: number;
+      actorUserId?: number | null;
+    }
+  ) {
+    return db.transaction(async (tx) => {
+      const [line] = await tx
+        .select()
+        .from(productionOrderLines)
+        .where(eq(productionOrderLines.id, lineId));
+      if (!line) throw new NotFoundError("Production order line not found");
+
+      const previousReturned = Number(line.extraRollsReturned ?? 0);
+      const newReturned = Number(data.extraRollsReturned);
+      const deltaReturned = newReturned - previousReturned;
+
+      const [updatedLine] = await tx
+        .update(productionOrderLines)
+        .set({
+          usedRolls: String(data.usedRolls),
+          usedWeight: String(data.usedWeight),
+          extraRollsReturned: String(data.extraRollsReturned),
+          extraWeight: String(data.extraWeight),
+          reconciledAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(productionOrderLines.id, lineId))
+        .returning();
+
+      if (deltaReturned !== 0 && line.materialCode) {
+        const [stock] = await tx
+          .select()
+          .from(inventoryRolls)
+          .where(eq(inventoryRolls.materialCode, line.materialCode));
+
+        if (stock) {
+          const newIssued = Math.max(0, Number(stock.issuedRolls) - deltaReturned);
+          const newBalance = Math.max(0, Number(stock.balanceRolls) + deltaReturned);
+
+          await tx
+            .update(inventoryRolls)
+            .set({
+              issuedRolls: String(newIssued),
+              balanceRolls: String(newBalance),
+              updatedAt: new Date(),
+            })
+            .where(eq(inventoryRolls.id, stock.id));
+
+          await tx.insert(inventoryRollMovements).values({
+            inventoryRollId: stock.id,
+            materialCode: line.materialCode,
+            movementType: "production_release",
+            rolls: String(deltaReturned),
+            balanceAfter: String(newBalance),
+            referenceType: "production_order_line",
+            referenceId: lineId,
+            note: `Stock reconciliation return for ${line.labelType} (${data.extraRollsReturned} rolls returned, ${data.extraWeight} kg extra)`,
+            actorUserId: data.actorUserId ?? null,
+          });
+        }
+      }
+
+      return updatedLine;
+    });
   }
 }
 

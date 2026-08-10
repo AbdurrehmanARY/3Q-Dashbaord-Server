@@ -1,11 +1,16 @@
 import { Router } from "express";
 import { workOrderController } from "@api/controllers/work-order.controller";
+import { productionRunController } from "@api/controllers/production-run.controller";
 import { validateRequest, validateQuery, validateParams } from "@api/middleware/validateRequest";
 import {
   createWorkOrderSchema,
   updateWorkOrderSchema,
   dispatchWorkOrderSchema,
 } from "@api/validations/work-orders.validation";
+import {
+  createProductionRunSchema,
+  saleOrderParamsSchema,
+} from "@api/validations/production-run.validation";
 import { listWorkOrdersQuerySchema } from "@api/validations/query.validation";
 import { idParamsSchema } from "@api/validations/common.validation";
 
@@ -23,5 +28,18 @@ router.post(
   workOrderController.dispatchWorkOrder
 );
 router.delete("/:id", validateParams(idParamsSchema), workOrderController.deleteWorkOrder);
+
+/* ---- Append-only production runs against a sale order ---- */
+router.get(
+  "/:saleOrderId/production-summary",
+  validateParams(saleOrderParamsSchema),
+  productionRunController.getSummary
+);
+router.post(
+  "/:saleOrderId/production-runs",
+  validateParams(saleOrderParamsSchema),
+  validateRequest(createProductionRunSchema),
+  productionRunController.logRun
+);
 
 export default router;

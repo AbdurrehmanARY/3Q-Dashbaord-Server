@@ -43,6 +43,7 @@ export function buildProductionOverviewBody(
       planning: {
         quantity: n.quantity,
         labelSize: n.labelSize,
+        rollLength: n.rollLength,
         requiredRolls: n.requiredRolls,
         extraRolls: n.extraRolls,
         totalRolls: n.totalRolls,
@@ -102,14 +103,15 @@ export function buildProductionOverviewBody(
       liveProgress: {
         totalRolls: n.totalRolls,
         printedRolls: n.printedRolls,
-        /** Printed but not yet handed to cutting. */
+        unprintedRolls: Math.max(n.totalRolls - n.printedRolls, 0),
         waitingForCutting: Math.max(n.printedRolls - n.sentToCuttingRolls, 0),
         sentToCuttingRolls: n.sentToCuttingRolls,
         cutRolls: n.cutRolls,
-        /** Cut but not yet handed to packaging. */
+        inCuttingProcess: Math.max(n.sentToCuttingRolls - n.cutRolls, 0),
         waitingForPackaging: Math.max(n.cutRolls - n.sentToPackagingRolls, 0),
         sentToPackagingRolls: n.sentToPackagingRolls,
         packagedRolls: n.packagedRolls,
+        inPackagingProcess: Math.max(n.sentToPackagingRolls - n.packagedRolls, 0),
         completionPct: completionPct(n.packagedRolls, n.totalRolls),
       },
     };
@@ -139,10 +141,13 @@ export function buildProductionOverviewBody(
     issuedRolls: sum((n) => n.issuedRolls),
     pendingIssue: sum((n) => Math.max(n.totalRolls - n.issuedRolls, 0)),
     printedRolls: sum((n) => n.printedRolls),
+    unprintedRolls: sum((n) => Math.max(n.totalRolls - n.printedRolls, 0)),
     sentToCuttingRolls: sum((n) => n.sentToCuttingRolls),
     cutRolls: sum((n) => n.cutRolls),
+    inCuttingProcess: sum((n) => Math.max(n.sentToCuttingRolls - n.cutRolls, 0)),
     sentToPackagingRolls: sum((n) => n.sentToPackagingRolls),
     packagedRolls,
+    inPackagingProcess: sum((n) => Math.max(n.sentToPackagingRolls - n.packagedRolls, 0)),
     waitingForCutting: sum((n) => Math.max(n.printedRolls - n.sentToCuttingRolls, 0)),
     waitingForPackaging: sum((n) => Math.max(n.cutRolls - n.sentToPackagingRolls, 0)),
     completionPct: completionPct(packagedRolls, totalRolls),

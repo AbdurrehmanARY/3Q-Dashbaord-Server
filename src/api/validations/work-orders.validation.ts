@@ -1,6 +1,21 @@
 import { z } from "zod";
 
 /**
+ * Artwork accepts either an uploaded image (stored inline as a base64 `data:` URI —
+ * the file-upload path) or an external `http(s)` URL. The column is `text`, so the
+ * generous size cap (~4 MB of base64 ≈ a ~3 MB source image) is the only guard.
+ */
+export const artworkImageSchema = z
+  .string()
+  .trim()
+  .max(4_000_000, "Image is too large — keep it under about 3 MB")
+  .refine(
+    (v) => v === "" || /^data:image\/[\w.+-]+;base64,/.test(v) || /^https?:\/\/.+/i.test(v),
+    "Artwork must be an uploaded image or a valid image URL"
+  )
+  .optional();
+
+/**
  * A sales order carries only its commercial header. The label-type breakdown
  * (label type, quantity, label size, roll length) belongs to the production order
  * and is entered by the production manager during planning.
@@ -12,7 +27,15 @@ export const wovenDetailSchema = z.object({
   repeat: z.coerce.number().positive("Repeat must be greater than 0"),
   density: z.coerce.number().int().positive("Density must be greater than 0"),
   extra: z.coerce.number().min(0, "Extra cannot be negative").optional(),
+  /** Size labels woven on this order, e.g. ["10", "12", "XL", "34/34"]. */
+  sizeLabels: z.array(z.string().trim().min(1)).optional(),
 });
+
+/** Scheduling priority and reason-for-order — set on any order, woven or printed. */
+export const WORK_ORDER_PRIORITIES = ["normal", "urgent", "emergency"] as const;
+export const WORK_ORDER_TYPES = ["normal order", "shortfall", "additional order", "recut order"] as const;
+export const prioritySchema = z.enum(WORK_ORDER_PRIORITIES).default("normal");
+export const orderTypeSchema = z.enum(WORK_ORDER_TYPES).default("normal order");
 
 export const createWorkOrderSchema = z.object({
   body: z
@@ -24,8 +47,10 @@ export const createWorkOrderSchema = z.object({
       totalQty: z.coerce.number().int().positive("Total quantity must be greater than 0"),
       brandId: z.coerce.number().int().positive("Brand ID must be a positive integer").optional(),
       comment: z.string().optional(),
-      /** Artwork / reference image URL, rendered on the detail page. */
-      imageUrl: z.string().trim().url("Image must be a valid URL").max(2048).optional().or(z.literal("")),
+      priority: prioritySchema,
+      orderType: orderTypeSchema,
+      /** Artwork image — uploaded file (base64 data URI) or external URL. */
+      imageUrl: artworkImageSchema,
       productType: z.enum(["printed", "woven"]).default("printed"),
       /** Required when `productType` is `woven`, rejected otherwise (see refine below). */
       wovenDetail: wovenDetailSchema.optional(),
@@ -43,7 +68,9 @@ export const updateWorkOrderSchema = z.object({
     totalQty: z.coerce.number().int().positive().optional(),
     brandId: z.coerce.number().int().positive().optional(),
     comment: z.string().optional(),
-    imageUrl: z.string().trim().url("Image must be a valid URL").max(2048).optional().or(z.literal("")),
+    priority: prioritySchema.optional(),
+    orderType: orderTypeSchema.optional(),
+    imageUrl: artworkImageSchema,
     // `status` and `productType` are deliberately absent: status is derived from the
     // production order, and a sales order cannot change which workflow it runs through.
     dcNumber: z.string().optional(),
@@ -67,6 +94,7 @@ export const dispatchWorkOrderSchema = z.object({
     fbrInvoiceNumber: z.string().trim().min(1, "FBR Invoice Number is required to dispatch"),
     dispatchedDate: z.string().min(1, "Dispatch date is required"),
     dispatchedQty: z.coerce.number().int().positive("Dispatch quantity must be greater than 0"),
+    imageUrl: artworkImageSchema,
   }),
 });
 

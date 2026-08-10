@@ -4,18 +4,27 @@
  * a production order line are always the ones computed here.
  */
 
+/** Default roll length in metres when a line does not specify one (200 m ⇒ the old 7800 constant). */
+export const DEFAULT_ROLL_LENGTH_M = 200;
+
 /**
  * Rolls required to produce `quantity` labels (fractional; stored with decimal precision).
  *
- *   requiredRolls = quantity / (7800 / (labelSizeMm / 25))
+ *   labelsPerRoll = (rollLength × 39) / (labelSizeMm / 25)
+ *   requiredRolls = quantity / labelsPerRoll
  *
- * i.e. labels-per-roll = 7800 / (labelSizeMm / 25), and requiredRolls = quantity / labelsPerRoll.
- * Roll length is deliberately NOT a factor — this formula replaced the earlier
- * length-based one.
+ * Roll length is now a factor (100 / 200 / 400 m …), configurable per line. At the legacy
+ * default of 200 m this is identical to the previous `7800 / (labelSizeMm / 25)` form,
+ * since 200 × 39 = 7800, so pre-existing lines are unaffected.
  */
-export function calculateRequiredRolls(quantity: number, labelSizeMm: number): number {
+export function calculateRequiredRolls(
+  quantity: number,
+  labelSizeMm: number,
+  rollLength: number = DEFAULT_ROLL_LENGTH_M
+): number {
+  const length = rollLength > 0 ? rollLength : DEFAULT_ROLL_LENGTH_M;
   if (!(quantity > 0) || !(labelSizeMm > 0)) return 0;
-  const labelsPerRoll = 7800 / (labelSizeMm / 25);
+  const labelsPerRoll = (length * 39) / (labelSizeMm / 25);
   if (!(labelsPerRoll > 0)) return 0;
   return quantity / labelsPerRoll;
 }

@@ -10,6 +10,7 @@ import type {
   TransferRollsDTO,
   IssueRollsDTO,
   UpdateLineFullDTO,
+  ReconcileLineDTO,
 } from "../validations/production-orders.validation";
 import type { ListProductionOrdersQueryDTO } from "../validations/query.validation";
 
@@ -166,6 +167,13 @@ class ProductionOrderController {
     const { id } = (req.validatedParams ?? req.params) as { id: string };
     const page = (req.validatedQuery ?? {}) as { limit?: number; offset?: number };
     const data = await productionOrderService.getOrderEvents(id, page);
+    res.json({ data });
+  });
+
+  reconcileLine = asyncHandler(async (req: Request, res: Response) => {
+    const { lineId } = (req.validatedParams ?? req.params) as { lineId: string };
+    const input = (req.validatedBody ?? req.body) as ReconcileLineDTO;
+    const data = await productionOrderService.reconcileLine(lineId, input);
     res.json({ data });
   });
 }

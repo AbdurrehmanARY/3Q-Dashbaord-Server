@@ -198,7 +198,7 @@ export class ThreadInventoryRepository {
    * Finds a ledger row by its identity, or creates it at zero. Locked `FOR UPDATE` on the
    * way out so the caller can safely compute against the balance it just read.
    */
-  private async getOrCreateStockTx(
+  async getOrCreateStockTx(
     tx: Tx,
     identity: { stockType: StockType; denier: Denier; colorName: string; colorCode: string | null }
   ): Promise<ThreadStock> {

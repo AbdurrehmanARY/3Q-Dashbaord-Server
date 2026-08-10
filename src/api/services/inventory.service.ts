@@ -10,20 +10,24 @@ interface DerivedInputs {
   rollsPerCarton: number;
   rollLength: number;
   netWeight: number;
+  /** Weight per roll (kg) entered on the purchase; falls back to the material's. */
+  weightPerRoll?: number;
 }
 
 /**
- * `totalRoll`, `totalRollPer200m`, `invoiceWeight` and `localWeight` are always
- * calculated here — never trusted from the client. `localWeight` comes from the
- * purchased material's `weightPerRoll`, not from the purchase inputs.
+ * `totalRoll`, `totalRollPer200m`, `invoiceWeight` are always calculated here — never
+ * trusted from the client. `localWeight` is the weight per roll: taken from the purchase
+ * input when given, else the material's `weightPerRoll`. Total weight is derived on read as
+ * `totalRoll × localWeight`, so it is never stored redundantly.
  */
 function calculateDerivedFields(inputs: DerivedInputs, material: Material) {
   const totalRoll = inputs.cartonQty * inputs.rollsPerCarton;
+  const weightPerRoll = inputs.weightPerRoll ?? Number(material.weightPerRoll);
   return {
     totalRoll: String(totalRoll),
     totalRollPer200m: String(calculateTotalRollPer200m(totalRoll, inputs.rollLength)),
     invoiceWeight: String(calculateInvoiceWeight(inputs.netWeight, totalRoll, inputs.rollLength)),
-    localWeight: material.weightPerRoll,
+    localWeight: String(weightPerRoll),
   };
 }
 
@@ -42,6 +46,7 @@ export class InventoryService {
     rollsPerCarton: number;
     rollLength: number;
     netWeight: number;
+    weightPerRoll?: number;
     efs?: string;
     gdNumber?: string;
   }): Promise<PurchaseRecord> {
@@ -90,13 +95,15 @@ export class InventoryService {
     rollsPerCarton?: number;
     rollLength?: number;
     netWeight?: number;
+    weightPerRoll?: number;
     efs?: string;
     gdNumber?: string;
   }) {
     const existing = await inventoryRepository.findPurchaseById(id);
     if (!existing) throw new NotFoundError(Messages.notFound(Entity.PURCHASE_RECORD));
 
-    const { materialCode, rollLength, netWeight, ...rest } = data;
+    // weightPerRoll is not a column — it feeds calculateDerivedFields (→ localWeight).
+    const { materialCode, rollLength, netWeight, weightPerRoll, ...rest } = data;
     const updateData: Record<string, unknown> = { ...rest };
 
     const newMaterialCode = materialCode ?? existing.materialCode;
@@ -118,6 +125,7 @@ export class InventoryService {
         rollsPerCarton: data.rollsPerCarton ?? existing.rollsPerCarton,
         rollLength: rollLength ?? Number(existing.rollLength),
         netWeight: netWeight ?? Number(existing.netWeight),
+        weightPerRoll: weightPerRoll ?? (existing.localWeight != null ? Number(existing.localWeight) : undefined),
       },
       material
     );

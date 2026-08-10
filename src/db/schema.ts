@@ -13,7 +13,17 @@ export * from "./tables/production-roll-issuances.table";
 export * from "./tables/purchase-record.table";
 export * from "./tables/inventory-rolls.table";
 export * from "./tables/inventory-roll-movements.table";
+/* ---------- Ink purchasing / stock / consumption ---------- */
+export * from "./tables/ink-purchases.table";
+export * from "./tables/ink-consumptions.table";
 export * from "./tables/operator-type.enum";
+/* ---------- Append-only production runs ---------- */
+export * from "./tables/production-run-reason.enum";
+export * from "./tables/production-runs.table";
+/* ---------- Other material receipts ---------- */
+export * from "./tables/sticker-materials.table";
+export * from "./tables/local-sheets.table";
+export * from "./tables/label-sheets.table";
 /* ---------- Woven Labels workflow ---------- */
 export * from "./tables/product-type.enum";
 export * from "./tables/woven-work-order-details.table";
@@ -25,6 +35,9 @@ export * from "./tables/thread-stocks.table";
 export * from "./tables/thread-purchases.table";
 export * from "./tables/thread-dye-batches.table";
 export * from "./tables/thread-stock-movements.table";
+/* ---------- Thread dyeing service-provider workflow ---------- */
+export * from "./tables/thread-service-providers.table";
+export * from "./tables/thread-dyeing-workflow.table";
 export * from "./relations/index";
 
 import { companies } from "./tables/companies.table";
@@ -41,6 +54,8 @@ import { productionRollIssuances } from "./tables/production-roll-issuances.tabl
 import { purchaseRecords } from "./tables/purchase-record.table";
 import { inventoryRolls } from "./tables/inventory-rolls.table";
 import { inventoryRollMovements } from "./tables/inventory-roll-movements.table";
+import { inkPurchases } from "./tables/ink-purchases.table";
+import { inkConsumptions } from "./tables/ink-consumptions.table";
 import { wovenWorkOrderDetails } from "./tables/woven-work-order-details.table";
 import { wovenProductionLines } from "./tables/woven-production-lines.table";
 import { wovenThreadPlanItems } from "./tables/woven-thread-plan-items.table";
@@ -48,6 +63,16 @@ import { threadStocks } from "./tables/thread-stocks.table";
 import { threadPurchases } from "./tables/thread-purchases.table";
 import { threadDyeBatches } from "./tables/thread-dye-batches.table";
 import { threadStockMovements } from "./tables/thread-stock-movements.table";
+import { productionRuns } from "./tables/production-runs.table";
+import { stickerMaterials } from "./tables/sticker-materials.table";
+import { localSheets } from "./tables/local-sheets.table";
+import { labelSheets } from "./tables/label-sheets.table";
+import { threadServiceProviders } from "./tables/thread-service-providers.table";
+import {
+  threadDyeingSends,
+  threadDyeingAllocations,
+  threadDyeingReceives,
+} from "./tables/thread-dyeing-workflow.table";
 
 export type Company = typeof companies.$inferSelect;
 export type NewCompany = typeof companies.$inferInsert;
@@ -77,6 +102,10 @@ export type InventoryRoll = typeof inventoryRolls.$inferSelect;
 export type NewInventoryRoll = typeof inventoryRolls.$inferInsert;
 export type InventoryRollMovement = typeof inventoryRollMovements.$inferSelect;
 export type NewInventoryRollMovement = typeof inventoryRollMovements.$inferInsert;
+export type InkPurchase = typeof inkPurchases.$inferSelect;
+export type NewInkPurchase = typeof inkPurchases.$inferInsert;
+export type InkConsumption = typeof inkConsumptions.$inferSelect;
+export type NewInkConsumption = typeof inkConsumptions.$inferInsert;
 
 /* ---------- Woven Labels workflow ---------- */
 export type WovenWorkOrderDetail = typeof wovenWorkOrderDetails.$inferSelect;
@@ -95,3 +124,25 @@ export type ThreadDyeBatch = typeof threadDyeBatches.$inferSelect;
 export type NewThreadDyeBatch = typeof threadDyeBatches.$inferInsert;
 export type ThreadStockMovement = typeof threadStockMovements.$inferSelect;
 export type NewThreadStockMovement = typeof threadStockMovements.$inferInsert;
+
+/* ---------- Append-only production runs ---------- */
+export type ProductionRun = typeof productionRuns.$inferSelect;
+export type NewProductionRun = typeof productionRuns.$inferInsert;
+
+/* ---------- Other material receipts ---------- */
+export type StickerMaterial = typeof stickerMaterials.$inferSelect;
+export type NewStickerMaterial = typeof stickerMaterials.$inferInsert;
+export type LocalSheet = typeof localSheets.$inferSelect;
+export type NewLocalSheet = typeof localSheets.$inferInsert;
+export type LabelSheet = typeof labelSheets.$inferSelect;
+export type NewLabelSheet = typeof labelSheets.$inferInsert;
+
+/* ---------- Thread dyeing service-provider workflow ---------- */
+export type ThreadServiceProvider = typeof threadServiceProviders.$inferSelect;
+export type NewThreadServiceProvider = typeof threadServiceProviders.$inferInsert;
+export type ThreadDyeingSend = typeof threadDyeingSends.$inferSelect;
+export type NewThreadDyeingSend = typeof threadDyeingSends.$inferInsert;
+export type ThreadDyeingAllocation = typeof threadDyeingAllocations.$inferSelect;
+export type NewThreadDyeingAllocation = typeof threadDyeingAllocations.$inferInsert;
+export type ThreadDyeingReceive = typeof threadDyeingReceives.$inferSelect;
+export type NewThreadDyeingReceive = typeof threadDyeingReceives.$inferInsert;

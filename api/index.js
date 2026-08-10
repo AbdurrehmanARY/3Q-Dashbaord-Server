@@ -20,13 +20,14 @@ var envSchema = z.object({
   PORT: z.coerce.number().default(5e3),
   DATABASE_URL: z.string().url(),
   // JWT_SECRET: z.string().min(1, "JWT_SECRET is required"),
-  CORS_ORIGIN: z.string().default("*")
-  // SUPABASE_URL: z.string().refine((val) => val === "" || z.string().url().safeParse(val).success, {
-  //   message: "Invalid url",
-  // }).optional().default(""),
-  // SUPABASE_ANON_KEY: z.string().optional().default(""),
-  // JWT_AUD: z.string().optional().default(""),
-  // JWT_ISS: z.string().optional().default(""),
+  CORS_ORIGIN: z.string().default("*"),
+  SMTP_HOST: z.string().default("mail.3qfacility.com"),
+  SMTP_PORT: z.coerce.number().default(465),
+  SMTP_SECURE: z.coerce.boolean().default(true),
+  SMTP_USER: z.string().default("info@3qfacility.com"),
+  SMTP_PASS: z.string().default("2021@g8021A"),
+  SMTP_FROM: z.string().default('"3Q Facility" <info@3qfacility.com>'),
+  CEO_EMAIL: z.string().default("ceo@3qfacility.com")
 });
 var env = envSchema.parse(process.env);
 var isDevelopment = env.NODE_ENV === "development";
@@ -35,15 +36,15 @@ var isTest = env.NODE_ENV === "test";
 
 // src/config/logger.ts
 var colors = {
-  debug: (text8) => `\x1B[36m[DEBUG]\x1B[0m ${text8}`,
-  info: (text8) => `\x1B[32m[INFO]\x1B[0m ${text8}`,
-  warn: (text8) => `\x1B[33m[WARN]\x1B[0m ${text8}`,
-  error: (text8) => `\x1B[31m[ERROR]\x1B[0m ${text8}`
+  debug: (text11) => `\x1B[36m[DEBUG]\x1B[0m ${text11}`,
+  info: (text11) => `\x1B[32m[INFO]\x1B[0m ${text11}`,
+  warn: (text11) => `\x1B[33m[WARN]\x1B[0m ${text11}`,
+  error: (text11) => `\x1B[31m[ERROR]\x1B[0m ${text11}`
 };
 var Logger = class {
   formatMessage(level, message) {
-    const timestamp22 = (/* @__PURE__ */ new Date()).toISOString();
-    return `${timestamp22} ${colors[level](level.toUpperCase())} ${message}`;
+    const timestamp30 = (/* @__PURE__ */ new Date()).toISOString();
+    return `${timestamp30} ${colors[level](level.toUpperCase())} ${message}`;
   }
   debug(message, ...args) {
     console.log(this.formatMessage("debug", message), ...args);
@@ -95,9 +96,11 @@ function asyncHandler(fn) {
 }
 
 // src/api/utils/production-formula.ts
-function calculateRequiredRolls(quantity, labelSizeMm) {
+var DEFAULT_ROLL_LENGTH_M = 200;
+function calculateRequiredRolls(quantity, labelSizeMm, rollLength = DEFAULT_ROLL_LENGTH_M) {
+  const length = rollLength > 0 ? rollLength : DEFAULT_ROLL_LENGTH_M;
   if (!(quantity > 0) || !(labelSizeMm > 0)) return 0;
-  const labelsPerRoll = 7800 / (labelSizeMm / 25);
+  const labelsPerRoll = length * 39 / (labelSizeMm / 25);
   if (!(labelsPerRoll > 0)) return 0;
   return quantity / labelsPerRoll;
 }
@@ -248,7 +251,7 @@ var authRateLimiter = rateLimit({
 });
 
 // src/api/routes/index.ts
-import { Router as Router16 } from "express";
+import { Router as Router20 } from "express";
 
 // src/api/routes/index.routes.ts
 import { Router } from "express";
@@ -280,9 +283,13 @@ __export(schema_exports, {
   brandsRelations: () => brandsRelations,
   companies: () => companies,
   companiesRelations: () => companiesRelations,
+  inkConsumptions: () => inkConsumptions,
+  inkPurchases: () => inkPurchases,
   inventoryRollMovements: () => inventoryRollMovements,
   inventoryRolls: () => inventoryRolls,
   inventoryRollsRelations: () => inventoryRollsRelations,
+  labelSheets: () => labelSheets,
+  localSheets: () => localSheets,
   machines: () => machines,
   machinesRelations: () => machinesRelations,
   materials: () => materials,
@@ -299,18 +306,31 @@ __export(schema_exports, {
   productionOrdersRelations: () => productionOrdersRelations,
   productionRollIssuances: () => productionRollIssuances,
   productionRollIssuancesRelations: () => productionRollIssuancesRelations,
+  productionRunReasonEnum: () => productionRunReasonEnum,
+  productionRuns: () => productionRuns,
+  productionRunsRelations: () => productionRunsRelations,
   productionStageEvents: () => productionStageEvents,
   productionStageEventsRelations: () => productionStageEventsRelations,
   productionStatusEnum: () => productionStatusEnum,
   purchaseRecords: () => purchaseRecords,
   purchaseRecordsRelations: () => purchaseRecordsRelations,
   rollMovementTypeEnum: () => rollMovementTypeEnum,
+  stickerMaterials: () => stickerMaterials,
   threadBaseColorEnum: () => threadBaseColorEnum,
   threadDenierEnum: () => threadDenierEnum,
   threadDyeBatches: () => threadDyeBatches,
   threadDyeBatchesRelations: () => threadDyeBatchesRelations,
+  threadDyeingAllocations: () => threadDyeingAllocations,
+  threadDyeingAllocationsRelations: () => threadDyeingAllocationsRelations,
+  threadDyeingReceives: () => threadDyeingReceives,
+  threadDyeingReceivesRelations: () => threadDyeingReceivesRelations,
+  threadDyeingSendStatusEnum: () => threadDyeingSendStatusEnum,
+  threadDyeingSends: () => threadDyeingSends,
+  threadDyeingSendsRelations: () => threadDyeingSendsRelations,
   threadMovementTypeEnum: () => threadMovementTypeEnum,
   threadPurchases: () => threadPurchases,
+  threadServiceProviders: () => threadServiceProviders,
+  threadServiceProvidersRelations: () => threadServiceProvidersRelations,
   threadStockMovements: () => threadStockMovements,
   threadStockMovementsRelations: () => threadStockMovementsRelations,
   threadStockTypeEnum: () => threadStockTypeEnum,
@@ -506,6 +526,17 @@ var workOrders = pgTable7(
     imageUrl: text3("image_url"),
     status: workOrderStatusEnum("status").default("initiate_production").notNull(),
     /**
+     * Scheduling priority, set by office staff on any order (woven or printed).
+     * Stored as a plain varchar (not a pg enum) so the value set is easy to extend —
+     * validated to `normal | urgent | emergency` by the Zod schema. Default `normal`.
+     */
+    priority: varchar7("priority", { length: 20 }).default("normal").notNull(),
+    /**
+     * Why this order exists. Validated to
+     * `normal order | shortfall | additional order | recut order`. Default `normal order`.
+     */
+    orderType: varchar7("order_type", { length: 30 }).default("normal order").notNull(),
+    /**
      * Which manufacturing workflow this order runs through. Defaults to `printed`, so every
      * pre-existing row keeps its current behaviour untouched. Woven orders additionally
      * carry a `woven_work_order_details` row with the loom specification.
@@ -625,6 +656,12 @@ var productionOrderLines = pgTable9(
     printingCompletedAt: timestamp9("printing_completed_at"),
     cuttingCompletedAt: timestamp9("cutting_completed_at"),
     packagingCompletedAt: timestamp9("packaging_completed_at"),
+    /* --- Stock Reconciliation after completion --- */
+    usedRolls: decimal2("used_rolls", { precision: 10, scale: 2 }).default("0").notNull(),
+    usedWeight: decimal2("used_weight", { precision: 14, scale: 4 }).default("0").notNull(),
+    extraRollsReturned: decimal2("extra_rolls_returned", { precision: 10, scale: 2 }).default("0").notNull(),
+    extraWeight: decimal2("extra_weight", { precision: 14, scale: 4 }).default("0").notNull(),
+    reconciledAt: timestamp9("reconciled_at"),
     status: productionStatusEnum("status").default("pending").notNull(),
     notes: text5("notes"),
     createdAt: timestamp9("created_at").defaultNow().notNull(),
@@ -787,82 +824,235 @@ var inventoryRollMovements = pgTable14(
   })
 );
 
-// src/db/tables/woven-work-order-details.table.ts
-import { pgTable as pgTable15, serial as serial15, integer as integer12, varchar as varchar14, numeric, timestamp as timestamp15, index as index11 } from "drizzle-orm/pg-core";
-var wovenWorkOrderDetails = pgTable15(
-  "woven_work_order_details",
+// src/db/tables/ink-purchases.table.ts
+import { pgTable as pgTable15, serial as serial15, varchar as varchar14, date as date3, decimal as decimal8, timestamp as timestamp15, index as index11 } from "drizzle-orm/pg-core";
+var inkPurchases = pgTable15(
+  "ink_purchases",
   {
     id: serial15("id").primaryKey(),
-    workOrderId: integer12("work_order_id").notNull().unique().references(() => workOrders.id, { onDelete: "cascade" }),
-    /** Customer-facing design identifier, e.g. "Guess 13R". Unique across the facility. */
-    designCode: varchar14("design_code", { length: 100 }).notNull().unique(),
-    /** Weft picks per unit, e.g. 853. */
-    pick: integer12("pick").notNull(),
-    /** Design repeat length, e.g. 60. */
-    repeat: numeric("repeat", { precision: 12, scale: 2 }).notNull(),
-    /** Warp density, e.g. 560. */
-    density: integer12("density").notNull(),
-    /** Extra allowance added on top of the ordered quantity, e.g. 150. */
-    extra: numeric("extra", { precision: 12, scale: 2 }).default("0").notNull(),
-    createdAt: timestamp15("created_at").defaultNow().notNull(),
-    updatedAt: timestamp15("updated_at").defaultNow().notNull()
+    reportDate: date3("report_date").notNull(),
+    materialCode: varchar14("material_code", { length: 100 }).notNull(),
+    vendor: varchar14("vendor", { length: 200 }).notNull(),
+    invoiceNumber: varchar14("invoice_number", { length: 100 }),
+    /** Units purchased (cans / tins / kg-lots — whatever the facility counts ink in). */
+    quantity: decimal8("quantity", { precision: 12, scale: 2 }).notNull(),
+    /** Weight per unit. */
+    weightPerQty: decimal8("weight_per_qty", { precision: 12, scale: 3 }).notNull(),
+    /** Server-calculated `quantity × weightPerQty`. */
+    totalWeight: decimal8("total_weight", { precision: 14, scale: 3 }).notNull(),
+    createdAt: timestamp15("created_at").defaultNow().notNull()
   },
   (table) => ({
-    workOrderIdx: index11("woven_wo_details_work_order_idx").on(table.workOrderId),
-    designCodeIdx: index11("woven_wo_details_design_code_idx").on(table.designCode)
+    materialCodeIdx: index11("ink_purchases_material_code_idx").on(table.materialCode)
+  })
+);
+
+// src/db/tables/ink-consumptions.table.ts
+import { pgTable as pgTable16, serial as serial16, varchar as varchar15, integer as integer12, decimal as decimal9, text as text8, timestamp as timestamp16, index as index12 } from "drizzle-orm/pg-core";
+var inkConsumptions = pgTable16(
+  "ink_consumptions",
+  {
+    id: serial16("id").primaryKey(),
+    materialCode: varchar15("material_code", { length: 100 }).notNull(),
+    /** Units drawn. */
+    qtyAssigned: decimal9("qty_assigned", { precision: 12, scale: 2 }).notNull(),
+    operatorId: integer12("operator_id").references(() => operators.id),
+    operatorName: varchar15("operator_name", { length: 200 }),
+    /** Weight consumed — this is what debits ink stock. */
+    weight: decimal9("weight", { precision: 14, scale: 3 }).notNull(),
+    note: text8("note"),
+    consumedAt: timestamp16("consumed_at").defaultNow().notNull()
+  },
+  (table) => ({
+    materialCodeIdx: index12("ink_consumptions_material_code_idx").on(table.materialCode),
+    operatorIdx: index12("ink_consumptions_operator_idx").on(table.operatorId)
+  })
+);
+
+// src/db/tables/production-run-reason.enum.ts
+import { pgEnum as pgEnum9 } from "drizzle-orm/pg-core";
+var productionRunReasonEnum = pgEnum9("production_run_reason", [
+  "initial",
+  "shortfall",
+  "additional_order",
+  "recut",
+  "rework",
+  "retry",
+  "other"
+]);
+
+// src/db/tables/production-runs.table.ts
+import { pgTable as pgTable17, uuid, integer as integer13, varchar as varchar16, decimal as decimal10, text as text9, timestamp as timestamp17, index as index13 } from "drizzle-orm/pg-core";
+var productionRuns = pgTable17(
+  "production_runs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    saleOrderId: integer13("sale_order_id").notNull().references(() => workOrders.id, { onDelete: "cascade" }),
+    /** Label type / product specification this pass produced. */
+    productId: varchar16("product_id", { length: 150 }),
+    machineId: integer13("machine_id").references(() => machines.id),
+    operatorId: integer13("operator_id").references(() => operators.id),
+    quantityProduced: decimal10("quantity_produced", { precision: 12, scale: 2 }).notNull(),
+    runReason: productionRunReasonEnum("run_reason").default("initial").notNull(),
+    notes: text9("notes"),
+    producedAt: timestamp17("produced_at", { withTimezone: true }).defaultNow().notNull(),
+    createdBy: integer13("created_by").references(() => users.id),
+    /** Client-supplied token for duplicate-submission protection. */
+    idempotencyKey: varchar16("idempotency_key", { length: 100 }),
+    createdAt: timestamp17("created_at").defaultNow().notNull(),
+    updatedAt: timestamp17("updated_at").defaultNow().notNull()
+  },
+  (table) => ({
+    saleOrderIdx: index13("production_runs_sale_order_idx").on(table.saleOrderId),
+    producedAtIdx: index13("production_runs_produced_at_idx").on(table.producedAt),
+    idempotencyIdx: index13("production_runs_idempotency_idx").on(table.idempotencyKey)
+  })
+);
+
+// src/db/tables/sticker-materials.table.ts
+import { pgTable as pgTable18, serial as serial17, varchar as varchar17, numeric, date as date4, timestamp as timestamp18, index as index14 } from "drizzle-orm/pg-core";
+var stickerMaterials = pgTable18(
+  "sticker_materials",
+  {
+    id: serial17("id").primaryKey(),
+    invoiceDate: date4("invoice_date").notNull(),
+    /** e.g. "4 x 6". */
+    stickerSize: varchar17("sticker_size", { length: 100 }).notNull(),
+    materialCode: varchar17("material_code", { length: 100 }).notNull(),
+    rollQuantity: numeric("roll_quantity", { precision: 12, scale: 2 }).notNull(),
+    weightPerRoll: numeric("weight_per_roll", { precision: 12, scale: 3 }).notNull(),
+    /** Server-calculated: rollQuantity × weightPerRoll. */
+    totalWeight: numeric("total_weight", { precision: 14, scale: 3 }).notNull(),
+    createdAt: timestamp18("created_at").defaultNow().notNull(),
+    updatedAt: timestamp18("updated_at").defaultNow().notNull()
+  },
+  (table) => ({
+    materialCodeIdx: index14("sticker_materials_material_code_idx").on(table.materialCode),
+    dateIdx: index14("sticker_materials_date_idx").on(table.invoiceDate)
+  })
+);
+
+// src/db/tables/local-sheets.table.ts
+import { pgTable as pgTable19, serial as serial18, varchar as varchar18, numeric as numeric2, date as date5, timestamp as timestamp19, index as index15 } from "drizzle-orm/pg-core";
+var localSheets = pgTable19(
+  "local_sheets",
+  {
+    id: serial18("id").primaryKey(),
+    date: date5("date").notNull(),
+    /** e.g. "20 x 30". */
+    materialCode: varchar18("material_code", { length: 100 }).notNull(),
+    packetQuantity: numeric2("packet_quantity", { precision: 12, scale: 2 }).notNull(),
+    packetWeight: numeric2("packet_weight", { precision: 12, scale: 3 }).notNull(),
+    /** Server-calculated: packetQuantity × packetWeight. */
+    totalWeight: numeric2("total_weight", { precision: 14, scale: 3 }).notNull(),
+    createdAt: timestamp19("created_at").defaultNow().notNull(),
+    updatedAt: timestamp19("updated_at").defaultNow().notNull()
+  },
+  (table) => ({
+    materialCodeIdx: index15("local_sheets_material_code_idx").on(table.materialCode),
+    dateIdx: index15("local_sheets_date_idx").on(table.date)
+  })
+);
+
+// src/db/tables/label-sheets.table.ts
+import { pgTable as pgTable20, serial as serial19, varchar as varchar19, numeric as numeric3, date as date6, timestamp as timestamp20, index as index16 } from "drizzle-orm/pg-core";
+var labelSheets = pgTable20(
+  "label_sheets",
+  {
+    id: serial19("id").primaryKey(),
+    date: date6("date").notNull(),
+    materialCode: varchar19("material_code", { length: 100 }).notNull(),
+    sheetQuantity: numeric3("sheet_quantity", { precision: 12, scale: 2 }).notNull(),
+    weightPerSheet: numeric3("weight_per_sheet", { precision: 12, scale: 3 }).notNull(),
+    /** Server-calculated: sheetQuantity × weightPerSheet. */
+    totalWeight: numeric3("total_weight", { precision: 14, scale: 3 }).notNull(),
+    createdAt: timestamp20("created_at").defaultNow().notNull(),
+    updatedAt: timestamp20("updated_at").defaultNow().notNull()
+  },
+  (table) => ({
+    materialCodeIdx: index16("label_sheets_material_code_idx").on(table.materialCode),
+    dateIdx: index16("label_sheets_date_idx").on(table.date)
+  })
+);
+
+// src/db/tables/woven-work-order-details.table.ts
+import { pgTable as pgTable21, serial as serial20, integer as integer14, varchar as varchar20, numeric as numeric4, jsonb, timestamp as timestamp21, index as index17 } from "drizzle-orm/pg-core";
+var wovenWorkOrderDetails = pgTable21(
+  "woven_work_order_details",
+  {
+    id: serial20("id").primaryKey(),
+    workOrderId: integer14("work_order_id").notNull().unique().references(() => workOrders.id, { onDelete: "cascade" }),
+    /** Customer-facing design identifier, e.g. "Guess 13R". Unique across the facility. */
+    designCode: varchar20("design_code", { length: 100 }).notNull().unique(),
+    /** Weft picks per unit, e.g. 853. */
+    pick: integer14("pick").notNull(),
+    /** Design repeat length, e.g. 60. */
+    repeat: numeric4("repeat", { precision: 12, scale: 2 }).notNull(),
+    /** Warp density, e.g. 560. */
+    density: integer14("density").notNull(),
+    /** Extra allowance added on top of the ordered quantity, e.g. 150. */
+    extra: numeric4("extra", { precision: 12, scale: 2 }).default("0").notNull(),
+    /** Size labels woven on this order, e.g. ["10", "12", "XL", "34/34"]. */
+    sizeLabels: jsonb("size_labels").$type().default([]).notNull(),
+    createdAt: timestamp21("created_at").defaultNow().notNull(),
+    updatedAt: timestamp21("updated_at").defaultNow().notNull()
+  },
+  (table) => ({
+    workOrderIdx: index17("woven_wo_details_work_order_idx").on(table.workOrderId),
+    designCodeIdx: index17("woven_wo_details_design_code_idx").on(table.designCode)
   })
 );
 
 // src/db/tables/woven-production-lines.table.ts
-import { pgTable as pgTable16, serial as serial16, integer as integer13, numeric as numeric2, date as date3, timestamp as timestamp16, index as index12 } from "drizzle-orm/pg-core";
-var wovenProductionLines = pgTable16(
+import { pgTable as pgTable22, serial as serial21, integer as integer15, numeric as numeric5, date as date7, timestamp as timestamp22, index as index18 } from "drizzle-orm/pg-core";
+var wovenProductionLines = pgTable22(
   "woven_production_lines",
   {
-    id: serial16("id").primaryKey(),
-    productionOrderId: integer13("production_order_id").notNull().references(() => productionOrders.id, { onDelete: "cascade" }),
+    id: serial21("id").primaryKey(),
+    productionOrderId: integer15("production_order_id").notNull().references(() => productionOrders.id, { onDelete: "cascade" }),
     /** Pieces to produce — copied from the sales order quantity at planning time. */
-    quantity: numeric2("quantity", { precision: 14, scale: 2 }).notNull(),
+    quantity: numeric5("quantity", { precision: 14, scale: 2 }).notNull(),
     /* ---------- Planning ---------- */
     /** Sum of every thread plan item's weight. Server-calculated, never client-supplied. */
-    totalThreadWeightKg: numeric2("total_thread_weight_kg", { precision: 14, scale: 3 }).default("0").notNull(),
+    totalThreadWeightKg: numeric5("total_thread_weight_kg", { precision: 14, scale: 3 }).default("0").notNull(),
     /** True once thread colours + machine + operator are all set and stock is reserved. */
-    planningCompletedAt: timestamp16("planning_completed_at"),
+    planningCompletedAt: timestamp22("planning_completed_at"),
     /* ---------- Weaving ---------- */
-    weavingMachineId: integer13("weaving_machine_id").references(() => machines.id),
-    weavingOperatorId: integer13("weaving_operator_id").references(() => operators.id),
-    wovenQty: numeric2("woven_qty", { precision: 14, scale: 2 }).default("0").notNull(),
+    weavingMachineId: integer15("weaving_machine_id").references(() => machines.id),
+    weavingOperatorId: integer15("weaving_operator_id").references(() => operators.id),
+    wovenQty: numeric5("woven_qty", { precision: 14, scale: 2 }).default("0").notNull(),
     weavingStatus: productionStatusEnum("weaving_status").default("pending").notNull(),
-    weavingStartedAt: timestamp16("weaving_started_at"),
-    weavingEndedAt: timestamp16("weaving_ended_at"),
+    weavingStartedAt: timestamp22("weaving_started_at"),
+    weavingEndedAt: timestamp22("weaving_ended_at"),
     /* ---------- Cutting ---------- */
-    cuttingOperatorId: integer13("cutting_operator_id").references(() => operators.id),
-    cutQty: numeric2("cut_qty", { precision: 14, scale: 2 }).default("0").notNull(),
-    cuttingDate: date3("cutting_date"),
+    cuttingOperatorId: integer15("cutting_operator_id").references(() => operators.id),
+    cutQty: numeric5("cut_qty", { precision: 14, scale: 2 }).default("0").notNull(),
+    cuttingDate: date7("cutting_date"),
     /* ---------- Packaging ---------- */
-    packagingOperatorId: integer13("packaging_operator_id").references(() => operators.id),
-    packagedQty: numeric2("packaged_qty", { precision: 14, scale: 2 }).default("0").notNull(),
-    packagedWeightKg: numeric2("packaged_weight_kg", { precision: 14, scale: 3 }).default("0").notNull(),
-    packagingDate: date3("packaging_date"),
+    packagingOperatorId: integer15("packaging_operator_id").references(() => operators.id),
+    packagedQty: numeric5("packaged_qty", { precision: 14, scale: 2 }).default("0").notNull(),
+    packagedWeightKg: numeric5("packaged_weight_kg", { precision: 14, scale: 3 }).default("0").notNull(),
+    packagingDate: date7("packaging_date"),
     /** Derived from the stage counters, exactly like the printed line's status. */
     status: productionStatusEnum("status").default("pending").notNull(),
-    createdAt: timestamp16("created_at").defaultNow().notNull(),
-    updatedAt: timestamp16("updated_at").defaultNow().notNull()
+    createdAt: timestamp22("created_at").defaultNow().notNull(),
+    updatedAt: timestamp22("updated_at").defaultNow().notNull()
   },
   (table) => ({
-    orderIdx: index12("woven_production_lines_order_idx").on(table.productionOrderId),
-    statusIdx: index12("woven_production_lines_status_idx").on(table.status)
+    orderIdx: index18("woven_production_lines_order_idx").on(table.productionOrderId),
+    statusIdx: index18("woven_production_lines_status_idx").on(table.status)
   })
 );
 
 // src/db/tables/woven-thread-plan-items.table.ts
-import { pgTable as pgTable18, serial as serial18, integer as integer14, varchar as varchar16, numeric as numeric4, timestamp as timestamp18, unique as unique7, index as index14 } from "drizzle-orm/pg-core";
+import { pgTable as pgTable24, serial as serial23, integer as integer16, varchar as varchar22, numeric as numeric7, timestamp as timestamp24, unique as unique7, index as index20 } from "drizzle-orm/pg-core";
 
 // src/db/tables/thread.enums.ts
-import { pgEnum as pgEnum9 } from "drizzle-orm/pg-core";
-var threadDenierEnum = pgEnum9("thread_denier", ["45", "75", "100", "150"]);
-var threadBaseColorEnum = pgEnum9("thread_base_color", ["White", "Black"]);
-var threadStockTypeEnum = pgEnum9("thread_stock_type", ["primary", "secondary"]);
-var threadMovementTypeEnum = pgEnum9("thread_movement_type", [
+import { pgEnum as pgEnum10 } from "drizzle-orm/pg-core";
+var threadDenierEnum = pgEnum10("thread_denier", ["45", "75", "100", "150"]);
+var threadBaseColorEnum = pgEnum10("thread_base_color", ["White", "Black"]);
+var threadStockTypeEnum = pgEnum10("thread_stock_type", ["primary", "secondary"]);
+var threadMovementTypeEnum = pgEnum10("thread_movement_type", [
   "purchase_receipt",
   // primary stock credited from a receiving record
   "dye_consume",
@@ -878,23 +1068,23 @@ var threadMovementTypeEnum = pgEnum9("thread_movement_type", [
 ]);
 
 // src/db/tables/thread-stocks.table.ts
-import { pgTable as pgTable17, serial as serial17, varchar as varchar15, numeric as numeric3, timestamp as timestamp17, unique as unique6, index as index13 } from "drizzle-orm/pg-core";
-var threadStocks = pgTable17(
+import { pgTable as pgTable23, serial as serial22, varchar as varchar21, numeric as numeric6, timestamp as timestamp23, unique as unique6, index as index19 } from "drizzle-orm/pg-core";
+var threadStocks = pgTable23(
   "thread_stocks",
   {
-    id: serial17("id").primaryKey(),
+    id: serial22("id").primaryKey(),
     stockType: threadStockTypeEnum("stock_type").notNull(),
     denier: threadDenierEnum("denier").notNull(),
     /** "White"/"Black" for primary; the dyed colour name (e.g. "Brown") for secondary. */
-    colorName: varchar15("color_name", { length: 100 }).notNull(),
+    colorName: varchar21("color_name", { length: 100 }).notNull(),
     /** Dye lot colour code, e.g. "22783". Null for undyed primary stock. */
-    colorCode: varchar15("color_code", { length: 100 }),
-    balanceKg: numeric3("balance_kg", { precision: 14, scale: 3 }).default("0").notNull(),
+    colorCode: varchar21("color_code", { length: 100 }),
+    balanceKg: numeric6("balance_kg", { precision: 14, scale: 3 }).default("0").notNull(),
     /** Running totals, for reporting — derived from the movement history. */
-    receivedKg: numeric3("received_kg", { precision: 14, scale: 3 }).default("0").notNull(),
-    consumedKg: numeric3("consumed_kg", { precision: 14, scale: 3 }).default("0").notNull(),
-    createdAt: timestamp17("created_at").defaultNow().notNull(),
-    updatedAt: timestamp17("updated_at").defaultNow().notNull()
+    receivedKg: numeric6("received_kg", { precision: 14, scale: 3 }).default("0").notNull(),
+    consumedKg: numeric6("consumed_kg", { precision: 14, scale: 3 }).default("0").notNull(),
+    createdAt: timestamp23("created_at").defaultNow().notNull(),
+    updatedAt: timestamp23("updated_at").defaultNow().notNull()
   },
   (table) => ({
     // One ledger row per distinct thread. Postgres treats NULLs as distinct in a unique
@@ -905,120 +1095,199 @@ var threadStocks = pgTable17(
       table.colorName,
       table.colorCode
     ),
-    typeIdx: index13("thread_stocks_type_idx").on(table.stockType),
-    denierIdx: index13("thread_stocks_denier_idx").on(table.denier)
+    typeIdx: index19("thread_stocks_type_idx").on(table.stockType),
+    denierIdx: index19("thread_stocks_denier_idx").on(table.denier)
   })
 );
 
 // src/db/tables/woven-thread-plan-items.table.ts
-var wovenThreadPlanItems = pgTable18(
+var wovenThreadPlanItems = pgTable24(
   "woven_thread_plan_items",
   {
-    id: serial18("id").primaryKey(),
-    wovenProductionLineId: integer14("woven_production_line_id").notNull().references(() => wovenProductionLines.id, { onDelete: "cascade" }),
+    id: serial23("id").primaryKey(),
+    wovenProductionLineId: integer16("woven_production_line_id").notNull().references(() => wovenProductionLines.id, { onDelete: "cascade" }),
     /** 1-8 — the colour slot, unique within the line. */
-    sortOrder: integer14("sort_order").notNull(),
-    colorName: varchar16("color_name", { length: 100 }).notNull(),
+    sortOrder: integer16("sort_order").notNull(),
+    colorName: varchar22("color_name", { length: 100 }).notNull(),
     denier: threadDenierEnum("denier").notNull(),
-    colorCode: varchar16("color_code", { length: 100 }).notNull(),
-    weightKg: numeric4("weight_kg", { precision: 14, scale: 3 }).notNull(),
+    colorCode: varchar22("color_code", { length: 100 }).notNull(),
+    weightKg: numeric7("weight_kg", { precision: 14, scale: 3 }).notNull(),
     /** The stock row this colour was drawn from — null until planning reserves it. */
-    threadStockId: integer14("thread_stock_id").references(() => threadStocks.id, {
+    threadStockId: integer16("thread_stock_id").references(() => threadStocks.id, {
       onDelete: "set null"
     }),
     /** Unused thread weight returned after completion. */
-    remainingWeightKg: numeric4("remaining_weight_kg", { precision: 14, scale: 3 }).default("0").notNull(),
+    remainingWeightKg: numeric7("remaining_weight_kg", { precision: 14, scale: 3 }).default("0").notNull(),
     /** Net weight consumed = weightKg - remainingWeightKg. */
-    actualConsumedWeightKg: numeric4("actual_consumed_weight_kg", { precision: 14, scale: 3 }),
-    createdAt: timestamp18("created_at").defaultNow().notNull(),
-    updatedAt: timestamp18("updated_at").defaultNow().notNull()
+    actualConsumedWeightKg: numeric7("actual_consumed_weight_kg", { precision: 14, scale: 3 }),
+    createdAt: timestamp24("created_at").defaultNow().notNull(),
+    updatedAt: timestamp24("updated_at").defaultNow().notNull()
   },
   (table) => ({
     slot: unique7("woven_thread_plan_items_slot_idx").on(table.wovenProductionLineId, table.sortOrder),
-    lineIdx: index14("woven_thread_plan_items_line_idx").on(table.wovenProductionLineId)
+    lineIdx: index20("woven_thread_plan_items_line_idx").on(table.wovenProductionLineId)
   })
 );
 
 // src/db/tables/thread-purchases.table.ts
-import { pgTable as pgTable19, serial as serial19, varchar as varchar17, integer as integer15, numeric as numeric5, date as date4, timestamp as timestamp19, index as index15 } from "drizzle-orm/pg-core";
-var threadPurchases = pgTable19(
+import { pgTable as pgTable25, serial as serial24, varchar as varchar23, integer as integer17, numeric as numeric8, date as date8, timestamp as timestamp25, index as index21 } from "drizzle-orm/pg-core";
+var threadPurchases = pgTable25(
   "thread_purchases",
   {
-    id: serial19("id").primaryKey(),
-    receivedDate: date4("received_date").notNull(),
+    id: serial24("id").primaryKey(),
+    receivedDate: date8("received_date").notNull(),
     /** Always "Thread" today; kept explicit so other raw items can join this table later. */
-    itemName: varchar17("item_name", { length: 100 }).default("Thread").notNull(),
+    itemName: varchar23("item_name", { length: 100 }).default("Thread").notNull(),
     /** The item code IS the denier — 45 / 75 / 100 / 150. */
     denier: threadDenierEnum("denier").notNull(),
     threadColor: threadBaseColorEnum("thread_color").notNull(),
-    vendor: varchar17("vendor", { length: 255 }).notNull(),
-    invoiceNumber: varchar17("invoice_number", { length: 100 }).notNull(),
+    vendor: varchar23("vendor", { length: 255 }).notNull(),
+    invoiceNumber: varchar23("invoice_number", { length: 100 }).notNull(),
     /** Cartons received. */
-    totalCtns: integer15("total_ctns").notNull(),
+    totalCtns: integer17("total_ctns").notNull(),
     /** Weight of a single carton, in kg. */
-    weightPerCtnKg: numeric5("weight_per_ctn_kg", { precision: 12, scale: 3 }).notNull(),
+    weightPerCtnKg: numeric8("weight_per_ctn_kg", { precision: 12, scale: 3 }).notNull(),
     /** Server-calculated: weightPerCtnKg * totalCtns. */
-    totalWeightKg: numeric5("total_weight_kg", { precision: 14, scale: 3 }).notNull(),
-    notes: varchar17("notes", { length: 500 }),
-    createdAt: timestamp19("created_at").defaultNow().notNull(),
-    updatedAt: timestamp19("updated_at").defaultNow().notNull()
+    totalWeightKg: numeric8("total_weight_kg", { precision: 14, scale: 3 }).notNull(),
+    notes: varchar23("notes", { length: 500 }),
+    createdAt: timestamp25("created_at").defaultNow().notNull(),
+    updatedAt: timestamp25("updated_at").defaultNow().notNull()
   },
   (table) => ({
-    vendorIdx: index15("thread_purchases_vendor_idx").on(table.vendor),
-    invoiceIdx: index15("thread_purchases_invoice_idx").on(table.invoiceNumber),
-    dateIdx: index15("thread_purchases_date_idx").on(table.receivedDate)
+    vendorIdx: index21("thread_purchases_vendor_idx").on(table.vendor),
+    invoiceIdx: index21("thread_purchases_invoice_idx").on(table.invoiceNumber),
+    dateIdx: index21("thread_purchases_date_idx").on(table.receivedDate)
   })
 );
 
 // src/db/tables/thread-dye-batches.table.ts
-import { pgTable as pgTable20, serial as serial20, integer as integer16, varchar as varchar18, numeric as numeric6, timestamp as timestamp20, index as index16 } from "drizzle-orm/pg-core";
-var threadDyeBatches = pgTable20(
+import { pgTable as pgTable26, serial as serial25, integer as integer18, varchar as varchar24, numeric as numeric9, timestamp as timestamp26, index as index22 } from "drizzle-orm/pg-core";
+var threadDyeBatches = pgTable26(
   "thread_dye_batches",
   {
-    id: serial20("id").primaryKey(),
-    batchNumber: varchar18("batch_number", { length: 100 }).notNull().unique(),
+    id: serial25("id").primaryKey(),
+    batchNumber: varchar24("batch_number", { length: 100 }).notNull().unique(),
     /** The primary (undyed) stock row consumed. */
-    fromStockId: integer16("from_stock_id").notNull().references(() => threadStocks.id, { onDelete: "restrict" }),
+    fromStockId: integer18("from_stock_id").notNull().references(() => threadStocks.id, { onDelete: "restrict" }),
     /** The secondary (dyed) stock row credited. */
-    toStockId: integer16("to_stock_id").notNull().references(() => threadStocks.id, { onDelete: "restrict" }),
+    toStockId: integer18("to_stock_id").notNull().references(() => threadStocks.id, { onDelete: "restrict" }),
     denier: threadDenierEnum("denier").notNull(),
     /** Resulting colour, denormalised onto the batch so history survives a stock rename. */
-    colorName: varchar18("color_name", { length: 100 }).notNull(),
-    colorCode: varchar18("color_code", { length: 100 }).notNull(),
-    inputWeightKg: numeric6("input_weight_kg", { precision: 14, scale: 3 }).notNull(),
-    outputWeightKg: numeric6("output_weight_kg", { precision: 14, scale: 3 }).notNull(),
-    notes: varchar18("notes", { length: 500 }),
-    actorUserId: integer16("actor_user_id").references(() => users.id),
-    createdAt: timestamp20("created_at").defaultNow().notNull()
+    colorName: varchar24("color_name", { length: 100 }).notNull(),
+    colorCode: varchar24("color_code", { length: 100 }).notNull(),
+    inputWeightKg: numeric9("input_weight_kg", { precision: 14, scale: 3 }).notNull(),
+    outputWeightKg: numeric9("output_weight_kg", { precision: 14, scale: 3 }).notNull(),
+    notes: varchar24("notes", { length: 500 }),
+    actorUserId: integer18("actor_user_id").references(() => users.id),
+    createdAt: timestamp26("created_at").defaultNow().notNull()
   },
   (table) => ({
-    fromIdx: index16("thread_dye_batches_from_idx").on(table.fromStockId),
-    toIdx: index16("thread_dye_batches_to_idx").on(table.toStockId)
+    fromIdx: index22("thread_dye_batches_from_idx").on(table.fromStockId),
+    toIdx: index22("thread_dye_batches_to_idx").on(table.toStockId)
   })
 );
 
 // src/db/tables/thread-stock-movements.table.ts
-import { pgTable as pgTable21, serial as serial21, integer as integer17, varchar as varchar19, numeric as numeric7, timestamp as timestamp21, index as index17 } from "drizzle-orm/pg-core";
-var threadStockMovements = pgTable21(
+import { pgTable as pgTable27, serial as serial26, integer as integer19, varchar as varchar25, numeric as numeric10, timestamp as timestamp27, index as index23 } from "drizzle-orm/pg-core";
+var threadStockMovements = pgTable27(
   "thread_stock_movements",
   {
-    id: serial21("id").primaryKey(),
-    threadStockId: integer17("thread_stock_id").notNull().references(() => threadStocks.id, { onDelete: "cascade" }),
+    id: serial26("id").primaryKey(),
+    threadStockId: integer19("thread_stock_id").notNull().references(() => threadStocks.id, { onDelete: "cascade" }),
     movementType: threadMovementTypeEnum("movement_type").notNull(),
     /** Signed: + credits the stock, - debits it. */
-    weightKg: numeric7("weight_kg", { precision: 14, scale: 3 }).notNull(),
+    weightKg: numeric10("weight_kg", { precision: 14, scale: 3 }).notNull(),
     /** Balance immediately after this movement — makes the history readable on its own. */
-    balanceAfterKg: numeric7("balance_after_kg", { precision: 14, scale: 3 }).notNull(),
-    referenceType: varchar19("reference_type", { length: 50 }),
-    referenceId: integer17("reference_id"),
-    note: varchar19("note", { length: 500 }),
-    actorUserId: integer17("actor_user_id").references(() => users.id),
-    createdAt: timestamp21("created_at").defaultNow().notNull()
+    balanceAfterKg: numeric10("balance_after_kg", { precision: 14, scale: 3 }).notNull(),
+    referenceType: varchar25("reference_type", { length: 50 }),
+    referenceId: integer19("reference_id"),
+    note: varchar25("note", { length: 500 }),
+    actorUserId: integer19("actor_user_id").references(() => users.id),
+    createdAt: timestamp27("created_at").defaultNow().notNull()
   },
   (table) => ({
-    stockIdx: index17("thread_stock_movements_stock_idx").on(table.threadStockId),
-    typeIdx: index17("thread_stock_movements_type_idx").on(table.movementType),
-    createdIdx: index17("thread_stock_movements_created_idx").on(table.createdAt)
+    stockIdx: index23("thread_stock_movements_stock_idx").on(table.threadStockId),
+    typeIdx: index23("thread_stock_movements_type_idx").on(table.movementType),
+    createdIdx: index23("thread_stock_movements_created_idx").on(table.createdAt)
+  })
+);
+
+// src/db/tables/thread-service-providers.table.ts
+import { pgTable as pgTable28, serial as serial27, varchar as varchar26, text as text10, timestamp as timestamp28, index as index24 } from "drizzle-orm/pg-core";
+var threadServiceProviders = pgTable28(
+  "thread_service_providers",
+  {
+    id: serial27("id").primaryKey(),
+    name: varchar26("name", { length: 255 }).notNull(),
+    contact: varchar26("contact", { length: 100 }),
+    address: text10("address"),
+    notes: text10("notes"),
+    createdAt: timestamp28("created_at").defaultNow().notNull(),
+    updatedAt: timestamp28("updated_at").defaultNow().notNull()
+  },
+  (table) => ({
+    nameIdx: index24("thread_service_providers_name_idx").on(table.name)
+  })
+);
+
+// src/db/tables/thread-dyeing-workflow.table.ts
+import { pgTable as pgTable29, serial as serial28, integer as integer20, varchar as varchar27, numeric as numeric11, date as date9, timestamp as timestamp29, pgEnum as pgEnum11, index as index25 } from "drizzle-orm/pg-core";
+var threadDyeingSendStatusEnum = pgEnum11("thread_dyeing_send_status", [
+  "sent",
+  "partially_received",
+  "received"
+]);
+var threadDyeingSends = pgTable29(
+  "thread_dyeing_sends",
+  {
+    id: serial28("id").primaryKey(),
+    serviceProviderId: integer20("service_provider_id").notNull().references(() => threadServiceProviders.id),
+    sendingDate: date9("sending_date").notNull(),
+    senderTrackingNumber: varchar27("sender_tracking_number", { length: 100 }),
+    denier: threadDenierEnum("denier").notNull(),
+    baseThreadColor: threadBaseColorEnum("base_thread_color").notNull(),
+    totalWeightSent: numeric11("total_weight_sent", { precision: 14, scale: 3 }).notNull(),
+    status: threadDyeingSendStatusEnum("status").default("sent").notNull(),
+    createdAt: timestamp29("created_at").defaultNow().notNull(),
+    updatedAt: timestamp29("updated_at").defaultNow().notNull()
+  },
+  (table) => ({
+    providerIdx: index25("thread_dyeing_sends_provider_idx").on(table.serviceProviderId),
+    dateIdx: index25("thread_dyeing_sends_date_idx").on(table.sendingDate)
+  })
+);
+var threadDyeingAllocations = pgTable29(
+  "thread_dyeing_allocations",
+  {
+    id: serial28("id").primaryKey(),
+    threadDyeingSendId: integer20("thread_dyeing_send_id").notNull().references(() => threadDyeingSends.id, { onDelete: "cascade" }),
+    colorName: varchar27("color_name", { length: 100 }).notNull(),
+    pantone: varchar27("pantone", { length: 50 }),
+    colorCode: varchar27("color_code", { length: 50 }),
+    /** Weight sent for this colour (the "before" weight). */
+    allocatedWeight: numeric11("allocated_weight", { precision: 14, scale: 3 }).notNull(),
+    /** Actual dyed weight received back (the "after" weight). Set at receive time; this is
+     *  what gets credited to dyed stock. Null until received. */
+    receivedWeight: numeric11("received_weight", { precision: 14, scale: 3 }),
+    createdAt: timestamp29("created_at").defaultNow().notNull()
+  },
+  (table) => ({
+    sendIdx: index25("thread_dyeing_allocations_send_idx").on(table.threadDyeingSendId)
+  })
+);
+var threadDyeingReceives = pgTable29(
+  "thread_dyeing_receives",
+  {
+    id: serial28("id").primaryKey(),
+    threadDyeingSendId: integer20("thread_dyeing_send_id").notNull().references(() => threadDyeingSends.id, { onDelete: "cascade" }),
+    receivingDate: date9("receiving_date").notNull(),
+    receiverTrackingNumber: varchar27("receiver_tracking_number", { length: 100 }),
+    invoiceNumber: varchar27("invoice_number", { length: 100 }),
+    createdAt: timestamp29("created_at").defaultNow().notNull(),
+    updatedAt: timestamp29("updated_at").defaultNow().notNull()
+  },
+  (table) => ({
+    sendIdx: index25("thread_dyeing_receives_send_idx").on(table.threadDyeingSendId)
   })
 );
 
@@ -1232,12 +1501,54 @@ var threadDyeBatchesRelations = relations(threadDyeBatches, ({ one }) => ({
     references: [users.id]
   })
 }));
+var productionRunsRelations = relations(productionRuns, ({ one }) => ({
+  saleOrder: one(workOrders, {
+    fields: [productionRuns.saleOrderId],
+    references: [workOrders.id]
+  }),
+  machine: one(machines, {
+    fields: [productionRuns.machineId],
+    references: [machines.id]
+  }),
+  operator: one(operators, {
+    fields: [productionRuns.operatorId],
+    references: [operators.id]
+  }),
+  createdBy: one(users, {
+    fields: [productionRuns.createdBy],
+    references: [users.id]
+  })
+}));
+var threadServiceProvidersRelations = relations(threadServiceProviders, ({ many }) => ({
+  sends: many(threadDyeingSends)
+}));
+var threadDyeingSendsRelations = relations(threadDyeingSends, ({ one, many }) => ({
+  serviceProvider: one(threadServiceProviders, {
+    fields: [threadDyeingSends.serviceProviderId],
+    references: [threadServiceProviders.id]
+  }),
+  allocations: many(threadDyeingAllocations),
+  receives: many(threadDyeingReceives)
+}));
+var threadDyeingAllocationsRelations = relations(threadDyeingAllocations, ({ one }) => ({
+  send: one(threadDyeingSends, {
+    fields: [threadDyeingAllocations.threadDyeingSendId],
+    references: [threadDyeingSends.id]
+  })
+}));
+var threadDyeingReceivesRelations = relations(threadDyeingReceives, ({ one }) => ({
+  send: one(threadDyeingSends, {
+    fields: [threadDyeingReceives.threadDyeingSendId],
+    references: [threadDyeingSends.id]
+  })
+}));
 var operatorsRelations = relations(operators, ({ one, many }) => ({
   machines: many(machines),
   user: one(users, {
     fields: [operators.userId],
     references: [users.id]
   }),
+  productionRuns: many(productionRuns),
   wovenWeavingLines: many(wovenProductionLines, { relationName: "wovenWeavingOperator" }),
   wovenCuttingLines: many(wovenProductionLines, { relationName: "wovenCuttingOperator" }),
   wovenPackagingLines: many(wovenProductionLines, { relationName: "wovenPackagingOperator" }),
@@ -1369,7 +1680,15 @@ var Entity = {
   MATERIAL_ISSUE: "Material issue",
   USER: "User",
   PRODUCTION_ORDER: "Production order",
-  PRODUCTION_ORDER_LINE: "Production order line"
+  PRODUCTION_ORDER_LINE: "Production order line",
+  PRODUCTION_RUN: "Production run",
+  STICKER_MATERIAL: "Sticker material",
+  LOCAL_SHEET: "Local sheet",
+  LABEL_SHEET: "Label sheet",
+  THREAD_SERVICE_PROVIDER: "Thread service provider",
+  THREAD_DYEING_SEND: "Thread dyeing send",
+  INK_PURCHASE: "Ink purchase",
+  INK_CONSUMPTION: "Ink consumption"
 };
 
 // src/api/services/company.service.ts
@@ -1788,23 +2107,331 @@ router5.put("/:id", validateParams(idParamsSchema), validateRequest(updateMateri
 router5.delete("/:id", validateParams(idParamsSchema), materialController.deleteMaterial);
 var materials_routes_default = router5;
 
-// src/api/routes/machines.routes.ts
+// src/api/routes/material-receipts.routes.ts
 import { Router as Router6 } from "express";
 
+// src/api/repositories/material-receipts.repository.ts
+import { desc, eq as eq3 } from "drizzle-orm";
+var StickerMaterialRepository = class {
+  findAll() {
+    return db.select().from(stickerMaterials).orderBy(desc(stickerMaterials.invoiceDate), desc(stickerMaterials.id));
+  }
+  async findById(id) {
+    const [row] = await db.select().from(stickerMaterials).where(eq3(stickerMaterials.id, id));
+    return row;
+  }
+  async create(data) {
+    const [row] = await db.insert(stickerMaterials).values(data).returning();
+    return row;
+  }
+  async update(id, data) {
+    const [row] = await db.update(stickerMaterials).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq3(stickerMaterials.id, id)).returning();
+    return row;
+  }
+  async remove(id) {
+    const [row] = await db.delete(stickerMaterials).where(eq3(stickerMaterials.id, id)).returning();
+    return row;
+  }
+};
+var LocalSheetRepository = class {
+  findAll() {
+    return db.select().from(localSheets).orderBy(desc(localSheets.date), desc(localSheets.id));
+  }
+  async findById(id) {
+    const [row] = await db.select().from(localSheets).where(eq3(localSheets.id, id));
+    return row;
+  }
+  async create(data) {
+    const [row] = await db.insert(localSheets).values(data).returning();
+    return row;
+  }
+  async update(id, data) {
+    const [row] = await db.update(localSheets).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq3(localSheets.id, id)).returning();
+    return row;
+  }
+  async remove(id) {
+    const [row] = await db.delete(localSheets).where(eq3(localSheets.id, id)).returning();
+    return row;
+  }
+};
+var LabelSheetRepository = class {
+  findAll() {
+    return db.select().from(labelSheets).orderBy(desc(labelSheets.date), desc(labelSheets.id));
+  }
+  async findById(id) {
+    const [row] = await db.select().from(labelSheets).where(eq3(labelSheets.id, id));
+    return row;
+  }
+  async create(data) {
+    const [row] = await db.insert(labelSheets).values(data).returning();
+    return row;
+  }
+  async update(id, data) {
+    const [row] = await db.update(labelSheets).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq3(labelSheets.id, id)).returning();
+    return row;
+  }
+  async remove(id) {
+    const [row] = await db.delete(labelSheets).where(eq3(labelSheets.id, id)).returning();
+    return row;
+  }
+};
+var stickerMaterialRepository = new StickerMaterialRepository();
+var localSheetRepository = new LocalSheetRepository();
+var labelSheetRepository = new LabelSheetRepository();
+
+// src/api/services/material-receipts.service.ts
+var money = (n) => String(n);
+var StickerMaterialService = class {
+  getAll() {
+    return stickerMaterialRepository.findAll();
+  }
+  async create(data) {
+    const totalWeight = money(data.rollQuantity * data.weightPerRoll);
+    return stickerMaterialRepository.create({
+      invoiceDate: data.invoiceDate,
+      stickerSize: data.stickerSize,
+      materialCode: data.materialCode,
+      rollQuantity: money(data.rollQuantity),
+      weightPerRoll: money(data.weightPerRoll),
+      totalWeight
+    });
+  }
+  async update(id, data) {
+    const existing = await stickerMaterialRepository.findById(id);
+    if (!existing) throw new NotFoundError(Messages.notFound(Entity.STICKER_MATERIAL));
+    const rollQuantity = data.rollQuantity ?? Number(existing.rollQuantity);
+    const weightPerRoll = data.weightPerRoll ?? Number(existing.weightPerRoll);
+    return stickerMaterialRepository.update(id, {
+      ...data.invoiceDate !== void 0 && { invoiceDate: data.invoiceDate },
+      ...data.stickerSize !== void 0 && { stickerSize: data.stickerSize },
+      ...data.materialCode !== void 0 && { materialCode: data.materialCode },
+      rollQuantity: money(rollQuantity),
+      weightPerRoll: money(weightPerRoll),
+      totalWeight: money(rollQuantity * weightPerRoll)
+    });
+  }
+  async remove(id) {
+    const existing = await stickerMaterialRepository.findById(id);
+    if (!existing) throw new NotFoundError(Messages.notFound(Entity.STICKER_MATERIAL));
+    await stickerMaterialRepository.remove(id);
+  }
+};
+var LocalSheetService = class {
+  getAll() {
+    return localSheetRepository.findAll();
+  }
+  async create(data) {
+    return localSheetRepository.create({
+      date: data.date,
+      materialCode: data.materialCode,
+      packetQuantity: money(data.packetQuantity),
+      packetWeight: money(data.packetWeight),
+      totalWeight: money(data.packetQuantity * data.packetWeight)
+    });
+  }
+  async update(id, data) {
+    const existing = await localSheetRepository.findById(id);
+    if (!existing) throw new NotFoundError(Messages.notFound(Entity.LOCAL_SHEET));
+    const packetQuantity = data.packetQuantity ?? Number(existing.packetQuantity);
+    const packetWeight = data.packetWeight ?? Number(existing.packetWeight);
+    return localSheetRepository.update(id, {
+      ...data.date !== void 0 && { date: data.date },
+      ...data.materialCode !== void 0 && { materialCode: data.materialCode },
+      packetQuantity: money(packetQuantity),
+      packetWeight: money(packetWeight),
+      totalWeight: money(packetQuantity * packetWeight)
+    });
+  }
+  async remove(id) {
+    const existing = await localSheetRepository.findById(id);
+    if (!existing) throw new NotFoundError(Messages.notFound(Entity.LOCAL_SHEET));
+    await localSheetRepository.remove(id);
+  }
+};
+var LabelSheetService = class {
+  getAll() {
+    return labelSheetRepository.findAll();
+  }
+  async create(data) {
+    return labelSheetRepository.create({
+      date: data.date,
+      materialCode: data.materialCode,
+      sheetQuantity: money(data.sheetQuantity),
+      weightPerSheet: money(data.weightPerSheet),
+      totalWeight: money(data.sheetQuantity * data.weightPerSheet)
+    });
+  }
+  async update(id, data) {
+    const existing = await labelSheetRepository.findById(id);
+    if (!existing) throw new NotFoundError(Messages.notFound(Entity.LABEL_SHEET));
+    const sheetQuantity = data.sheetQuantity ?? Number(existing.sheetQuantity);
+    const weightPerSheet = data.weightPerSheet ?? Number(existing.weightPerSheet);
+    return labelSheetRepository.update(id, {
+      ...data.date !== void 0 && { date: data.date },
+      ...data.materialCode !== void 0 && { materialCode: data.materialCode },
+      sheetQuantity: money(sheetQuantity),
+      weightPerSheet: money(weightPerSheet),
+      totalWeight: money(sheetQuantity * weightPerSheet)
+    });
+  }
+  async remove(id) {
+    const existing = await labelSheetRepository.findById(id);
+    if (!existing) throw new NotFoundError(Messages.notFound(Entity.LABEL_SHEET));
+    await labelSheetRepository.remove(id);
+  }
+};
+var stickerMaterialService = new StickerMaterialService();
+var localSheetService = new LocalSheetService();
+var labelSheetService = new LabelSheetService();
+
+// src/api/controllers/material-receipts.controller.ts
+var StickerMaterialController = class {
+  getAll = asyncHandler(async (_req, res) => {
+    res.json({ data: await stickerMaterialService.getAll() });
+  });
+  create = asyncHandler(async (req, res) => {
+    const input = req.validatedBody ?? req.body;
+    res.status(201).json({ data: await stickerMaterialService.create(input) });
+  });
+  update = asyncHandler(async (req, res) => {
+    const { id } = req.validatedParams ?? req.params;
+    const input = req.validatedBody ?? req.body;
+    res.json({ data: await stickerMaterialService.update(Number(id), input) });
+  });
+  remove = asyncHandler(async (req, res) => {
+    const { id } = req.validatedParams ?? req.params;
+    await stickerMaterialService.remove(Number(id));
+    res.status(204).send();
+  });
+};
+var LocalSheetController = class {
+  getAll = asyncHandler(async (_req, res) => {
+    res.json({ data: await localSheetService.getAll() });
+  });
+  create = asyncHandler(async (req, res) => {
+    const input = req.validatedBody ?? req.body;
+    res.status(201).json({ data: await localSheetService.create(input) });
+  });
+  update = asyncHandler(async (req, res) => {
+    const { id } = req.validatedParams ?? req.params;
+    const input = req.validatedBody ?? req.body;
+    res.json({ data: await localSheetService.update(Number(id), input) });
+  });
+  remove = asyncHandler(async (req, res) => {
+    const { id } = req.validatedParams ?? req.params;
+    await localSheetService.remove(Number(id));
+    res.status(204).send();
+  });
+};
+var LabelSheetController = class {
+  getAll = asyncHandler(async (_req, res) => {
+    res.json({ data: await labelSheetService.getAll() });
+  });
+  create = asyncHandler(async (req, res) => {
+    const input = req.validatedBody ?? req.body;
+    res.status(201).json({ data: await labelSheetService.create(input) });
+  });
+  update = asyncHandler(async (req, res) => {
+    const { id } = req.validatedParams ?? req.params;
+    const input = req.validatedBody ?? req.body;
+    res.json({ data: await labelSheetService.update(Number(id), input) });
+  });
+  remove = asyncHandler(async (req, res) => {
+    const { id } = req.validatedParams ?? req.params;
+    await labelSheetService.remove(Number(id));
+    res.status(204).send();
+  });
+};
+var stickerMaterialController = new StickerMaterialController();
+var localSheetController = new LocalSheetController();
+var labelSheetController = new LabelSheetController();
+
+// src/api/validations/material-receipts.validation.ts
+import { z as z8 } from "zod";
+var createStickerMaterialSchema = z8.object({
+  body: z8.object({
+    invoiceDate: z8.string().min(1, "Invoice date is required"),
+    stickerSize: z8.string().trim().min(1, "Sticker size is required"),
+    materialCode: z8.string().trim().min(1, "Material code is required"),
+    rollQuantity: z8.coerce.number().positive("Roll quantity must be greater than 0"),
+    weightPerRoll: z8.coerce.number().positive("Weight per roll must be greater than 0")
+  })
+});
+var updateStickerMaterialSchema = z8.object({
+  body: createStickerMaterialSchema.shape.body.partial()
+});
+var createLocalSheetSchema = z8.object({
+  body: z8.object({
+    date: z8.string().min(1, "Date is required"),
+    materialCode: z8.string().trim().min(1, "Material code is required"),
+    packetQuantity: z8.coerce.number().positive("Packet quantity must be greater than 0"),
+    packetWeight: z8.coerce.number().positive("Packet weight must be greater than 0")
+  })
+});
+var updateLocalSheetSchema = z8.object({
+  body: createLocalSheetSchema.shape.body.partial()
+});
+var createLabelSheetSchema = z8.object({
+  body: z8.object({
+    date: z8.string().min(1, "Date is required"),
+    materialCode: z8.string().trim().min(1, "Material code is required"),
+    sheetQuantity: z8.coerce.number().positive("Sheet quantity must be greater than 0"),
+    weightPerSheet: z8.coerce.number().positive("Weight per sheet must be greater than 0")
+  })
+});
+var updateLabelSheetSchema = z8.object({
+  body: createLabelSheetSchema.shape.body.partial()
+});
+
+// src/api/routes/material-receipts.routes.ts
+var stickerMaterialsRouter = Router6();
+stickerMaterialsRouter.get("/", stickerMaterialController.getAll);
+stickerMaterialsRouter.post("/", validateRequest(createStickerMaterialSchema), stickerMaterialController.create);
+stickerMaterialsRouter.put(
+  "/:id",
+  validateParams(idParamsSchema),
+  validateRequest(updateStickerMaterialSchema),
+  stickerMaterialController.update
+);
+stickerMaterialsRouter.delete("/:id", validateParams(idParamsSchema), stickerMaterialController.remove);
+var localSheetsRouter = Router6();
+localSheetsRouter.get("/", localSheetController.getAll);
+localSheetsRouter.post("/", validateRequest(createLocalSheetSchema), localSheetController.create);
+localSheetsRouter.put(
+  "/:id",
+  validateParams(idParamsSchema),
+  validateRequest(updateLocalSheetSchema),
+  localSheetController.update
+);
+localSheetsRouter.delete("/:id", validateParams(idParamsSchema), localSheetController.remove);
+var labelSheetsRouter = Router6();
+labelSheetsRouter.get("/", labelSheetController.getAll);
+labelSheetsRouter.post("/", validateRequest(createLabelSheetSchema), labelSheetController.create);
+labelSheetsRouter.put(
+  "/:id",
+  validateParams(idParamsSchema),
+  validateRequest(updateLabelSheetSchema),
+  labelSheetController.update
+);
+labelSheetsRouter.delete("/:id", validateParams(idParamsSchema), labelSheetController.remove);
+
+// src/api/routes/machines.routes.ts
+import { Router as Router7 } from "express";
+
 // src/api/repositories/machine.repository.ts
-import { eq as eq3, asc as asc3, and as and2, inArray } from "drizzle-orm";
+import { eq as eq4, asc as asc3, and as and2, inArray } from "drizzle-orm";
 var MachineRepository = class {
   async findAll(filters) {
     const conditions = [];
-    if (filters?.type) conditions.push(eq3(machines.machineType, filters.type));
+    if (filters?.type) conditions.push(eq4(machines.machineType, filters.type));
     if (filters?.productType) {
       conditions.push(inArray(machines.productType, [filters.productType, "both"]));
     }
-    if (!filters?.includeInactive) conditions.push(eq3(machines.isActive, true));
+    if (!filters?.includeInactive) conditions.push(eq4(machines.isActive, true));
     return db.select().from(machines).where(conditions.length > 0 ? and2(...conditions) : void 0).orderBy(asc3(machines.name));
   }
   async findById(id) {
-    const [machine] = await db.select().from(machines).where(eq3(machines.id, Number(id)));
+    const [machine] = await db.select().from(machines).where(eq4(machines.id, Number(id)));
     return machine;
   }
   async create(data) {
@@ -1812,27 +2439,27 @@ var MachineRepository = class {
     return machine;
   }
   async update(id, data) {
-    const [machine] = await db.update(machines).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq3(machines.id, Number(id))).returning();
+    const [machine] = await db.update(machines).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq4(machines.id, Number(id))).returning();
     return machine;
   }
   async softDelete(id) {
-    const [machine] = await db.update(machines).set({ isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(eq3(machines.id, Number(id))).returning();
+    const [machine] = await db.update(machines).set({ isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(eq4(machines.id, Number(id))).returning();
     return machine;
   }
 };
 var machineRepository = new MachineRepository();
 
 // src/api/repositories/production-order.repository.ts
-import { eq as eq4, desc, and as and3, sql, inArray as inArray2 } from "drizzle-orm";
+import { eq as eq5, desc as desc2, and as and3, sql, inArray as inArray2 } from "drizzle-orm";
 var DEFAULT_HISTORY_LIMIT = 200;
 function workOrderStatusFor(productionStatus) {
   return productionStatus === "complete" ? "complete" : "production";
 }
 async function syncWorkOrderStatusTx(tx, productionOrderId, productionStatus) {
   if (!productionStatus) return;
-  const [order] = await tx.select({ workOrderId: productionOrders.workOrderId }).from(productionOrders).where(eq4(productionOrders.id, productionOrderId));
+  const [order] = await tx.select({ workOrderId: productionOrders.workOrderId }).from(productionOrders).where(eq5(productionOrders.id, productionOrderId));
   if (!order) return;
-  await tx.update(workOrders).set({ status: workOrderStatusFor(productionStatus), updatedAt: /* @__PURE__ */ new Date() }).where(and3(eq4(workOrders.id, order.workOrderId), sql`${workOrders.status} <> 'dispatched'`));
+  await tx.update(workOrders).set({ status: workOrderStatusFor(productionStatus), updatedAt: /* @__PURE__ */ new Date() }).where(and3(eq5(workOrders.id, order.workOrderId), sql`${workOrders.status} <> 'dispatched'`));
 }
 var productionOrderSelect = {
   id: productionOrders.id,
@@ -1851,6 +2478,7 @@ var productionOrderSelect = {
   orderDate: workOrders.orderDate,
   dueDate: workOrders.dueDate,
   salesOrderQty: workOrders.totalQty,
+  priority: workOrders.priority,
   /** Which workflow this order runs — the dashboard branches on it. */
   productType: workOrders.productType,
   brandId: brands.id,
@@ -1862,27 +2490,77 @@ var ProductionOrderRepository = class {
   async findAll(filters) {
     const conditions = [];
     if (filters?.status) {
-      conditions.push(eq4(productionOrders.status, filters.status));
+      conditions.push(eq5(productionOrders.status, filters.status));
     }
     if (filters?.soNumber) conditions.push(sql`${workOrders.soNumber} ILIKE ${"%" + filters.soNumber + "%"}`);
     if (filters?.poNumber) conditions.push(sql`${workOrders.poNumber} ILIKE ${"%" + filters.poNumber + "%"}`);
-    if (filters?.workOrderId) conditions.push(eq4(productionOrders.workOrderId, filters.workOrderId));
-    return db.select(productionOrderSelect).from(productionOrders).innerJoin(workOrders, eq4(productionOrders.workOrderId, workOrders.id)).leftJoin(brands, eq4(workOrders.brandId, brands.id)).leftJoin(companies, eq4(brands.companyId, companies.id)).where(conditions.length > 0 ? and3(...conditions) : void 0).orderBy(desc(productionOrders.createdAt));
+    if (filters?.workOrderId) conditions.push(eq5(productionOrders.workOrderId, filters.workOrderId));
+    const orders = await db.select(productionOrderSelect).from(productionOrders).innerJoin(workOrders, eq5(productionOrders.workOrderId, workOrders.id)).leftJoin(brands, eq5(workOrders.brandId, brands.id)).leftJoin(companies, eq5(brands.companyId, companies.id)).where(conditions.length > 0 ? and3(...conditions) : void 0).orderBy(desc2(productionOrders.createdAt));
+    if (orders.length === 0) return [];
+    const orderIds = orders.map((o) => o.id);
+    const lineData = await db.select({
+      productionOrderId: productionOrderLines.productionOrderId,
+      printingMachineId: productionOrderLines.printingMachineId,
+      cuttingMachineId: productionOrderLines.cuttingMachineId,
+      quantity: productionOrderLines.quantity
+    }).from(productionOrderLines).where(inArray2(productionOrderLines.productionOrderId, orderIds));
+    const allMachinesList = await db.select({ id: machines.id, name: machines.name }).from(machines);
+    const machineById = new Map(allMachinesList.map((m) => [m.id, m.name]));
+    const machineMap = /* @__PURE__ */ new Map();
+    const plannedQtyMap = /* @__PURE__ */ new Map();
+    for (const lm of lineData) {
+      if (!machineMap.has(lm.productionOrderId)) {
+        machineMap.set(lm.productionOrderId, /* @__PURE__ */ new Set());
+      }
+      const set = machineMap.get(lm.productionOrderId);
+      if (lm.printingMachineId && machineById.has(lm.printingMachineId)) {
+        set.add(machineById.get(lm.printingMachineId));
+      }
+      if (lm.cuttingMachineId && machineById.has(lm.cuttingMachineId)) {
+        set.add(machineById.get(lm.cuttingMachineId));
+      }
+      const prevPlanned = plannedQtyMap.get(lm.productionOrderId) || 0;
+      plannedQtyMap.set(lm.productionOrderId, prevPlanned + Number(lm.quantity || 0));
+    }
+    return orders.map((order) => {
+      const set = machineMap.get(order.id);
+      const machineName = set && set.size > 0 ? Array.from(set).join(", ") : null;
+      const plannedQty = plannedQtyMap.get(order.id) || 0;
+      const unplannedQty = Math.max(0, Number(order.totalQty || 0) - plannedQty);
+      return { ...order, machineName, plannedQty, unplannedQty };
+    });
   }
   async findById(id) {
-    const [row] = await db.select(productionOrderSelect).from(productionOrders).innerJoin(workOrders, eq4(productionOrders.workOrderId, workOrders.id)).leftJoin(brands, eq4(workOrders.brandId, brands.id)).leftJoin(companies, eq4(brands.companyId, companies.id)).where(eq4(productionOrders.id, Number(id)));
-    return row;
+    const [row] = await db.select(productionOrderSelect).from(productionOrders).innerJoin(workOrders, eq5(productionOrders.workOrderId, workOrders.id)).leftJoin(brands, eq5(workOrders.brandId, brands.id)).leftJoin(companies, eq5(brands.companyId, companies.id)).where(eq5(productionOrders.id, Number(id)));
+    if (!row) return void 0;
+    const rawLines = await db.select({
+      printingMachineId: productionOrderLines.printingMachineId,
+      cuttingMachineId: productionOrderLines.cuttingMachineId
+    }).from(productionOrderLines).where(eq5(productionOrderLines.productionOrderId, Number(id)));
+    const allMachinesList = await db.select({ id: machines.id, name: machines.name }).from(machines);
+    const machineById = new Map(allMachinesList.map((m) => [m.id, m.name]));
+    const set = /* @__PURE__ */ new Set();
+    for (const l of rawLines) {
+      if (l.printingMachineId && machineById.has(l.printingMachineId)) {
+        set.add(machineById.get(l.printingMachineId));
+      }
+      if (l.cuttingMachineId && machineById.has(l.cuttingMachineId)) {
+        set.add(machineById.get(l.cuttingMachineId));
+      }
+    }
+    const machineName = set.size > 0 ? Array.from(set).join(", ") : null;
+    return { ...row, machineName };
   }
   async findRawById(id) {
-    const [row] = await db.select().from(productionOrders).where(eq4(productionOrders.id, Number(id)));
+    const [row] = await db.select().from(productionOrders).where(eq5(productionOrders.id, Number(id)));
     return row;
   }
   async findByWorkOrderId(workOrderId) {
-    const [row] = await db.select().from(productionOrders).where(eq4(productionOrders.workOrderId, Number(workOrderId)));
+    const [row] = await db.select().from(productionOrders).where(eq5(productionOrders.workOrderId, Number(workOrderId)));
     return row;
   }
   async findLastProductionNumber() {
-    const [row] = await db.select({ productionNumber: productionOrders.productionNumber }).from(productionOrders).orderBy(desc(productionOrders.id)).limit(1);
+    const [row] = await db.select({ productionNumber: productionOrders.productionNumber }).from(productionOrders).orderBy(desc2(productionOrders.id)).limit(1);
     return row?.productionNumber;
   }
   async create(data) {
@@ -1898,27 +2576,27 @@ var ProductionOrderRepository = class {
   async createWithWorkOrderStatusTx(data) {
     return db.transaction(async (tx) => {
       const [row] = await tx.insert(productionOrders).values(data).returning();
-      await tx.update(workOrders).set({ status: "production", updatedAt: /* @__PURE__ */ new Date() }).where(eq4(workOrders.id, data.workOrderId));
+      await tx.update(workOrders).set({ status: "production", updatedAt: /* @__PURE__ */ new Date() }).where(eq5(workOrders.id, data.workOrderId));
       return row;
     });
   }
   async update(id, data) {
-    const [row] = await db.update(productionOrders).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq4(productionOrders.id, Number(id))).returning();
+    const [row] = await db.update(productionOrders).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq5(productionOrders.id, Number(id))).returning();
     return row;
   }
   async delete(id) {
-    await db.delete(productionOrders).where(eq4(productionOrders.id, Number(id)));
+    await db.delete(productionOrders).where(eq5(productionOrders.id, Number(id)));
   }
   /* ---------------- Lines ---------------- */
   async findLines(productionOrderId) {
-    return db.select().from(productionOrderLines).where(eq4(productionOrderLines.productionOrderId, Number(productionOrderId))).orderBy(productionOrderLines.id);
+    return db.select().from(productionOrderLines).where(eq5(productionOrderLines.productionOrderId, Number(productionOrderId))).orderBy(productionOrderLines.id);
   }
   async findLineById(lineId) {
-    const [row] = await db.select().from(productionOrderLines).where(eq4(productionOrderLines.id, Number(lineId)));
+    const [row] = await db.select().from(productionOrderLines).where(eq5(productionOrderLines.id, Number(lineId)));
     return row;
   }
   async updateLine(lineId, data) {
-    const [row] = await db.update(productionOrderLines).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq4(productionOrderLines.id, Number(lineId))).returning();
+    const [row] = await db.update(productionOrderLines).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq5(productionOrderLines.id, Number(lineId))).returning();
     return row;
   }
   /**
@@ -1930,7 +2608,7 @@ var ProductionOrderRepository = class {
    */
   async drawStockTx(tx, lineId, materialCode, rolls, actorUserId) {
     if (!materialCode || !(rolls > 0)) return;
-    await tx.select({ id: inventoryRolls.id }).from(inventoryRolls).where(eq4(inventoryRolls.materialCode, materialCode)).for("update");
+    await tx.select({ id: inventoryRolls.id }).from(inventoryRolls).where(eq5(inventoryRolls.materialCode, materialCode)).for("update");
     await tx.insert(productionRollIssuances).values({
       productionOrderLineId: lineId,
       materialCode,
@@ -1942,7 +2620,7 @@ var ProductionOrderRepository = class {
       issuedRolls: sql`${inventoryRolls.issuedRolls} + ${rolls}`,
       balanceRolls: sql`${inventoryRolls.balanceRolls} - ${rolls}`,
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq4(inventoryRolls.materialCode, materialCode)).returning();
+    }).where(eq5(inventoryRolls.materialCode, materialCode)).returning();
     if (!stock || Number(stock.balanceRolls) < 0) {
       throw new BadRequestError(
         `Cannot assign ${rolls} rolls of ${materialCode}: not enough stock`
@@ -1954,22 +2632,22 @@ var ProductionOrderRepository = class {
     const drawn = await tx.select({
       materialCode: productionRollIssuances.materialCode,
       rolls: sql`sum(${productionRollIssuances.rolls})`
-    }).from(productionRollIssuances).where(eq4(productionRollIssuances.productionOrderLineId, lineId)).groupBy(productionRollIssuances.materialCode);
+    }).from(productionRollIssuances).where(eq5(productionRollIssuances.productionOrderLineId, lineId)).groupBy(productionRollIssuances.materialCode);
     for (const row of drawn) {
       const rolls = Number(row.rolls);
       await tx.update(inventoryRolls).set({
         issuedRolls: sql`${inventoryRolls.issuedRolls} - ${rolls}`,
         balanceRolls: sql`${inventoryRolls.balanceRolls} + ${rolls}`,
         updatedAt: /* @__PURE__ */ new Date()
-      }).where(eq4(inventoryRolls.materialCode, row.materialCode));
+      }).where(eq5(inventoryRolls.materialCode, row.materialCode));
     }
-    await tx.delete(productionRollIssuances).where(eq4(productionRollIssuances.productionOrderLineId, lineId));
+    await tx.delete(productionRollIssuances).where(eq5(productionRollIssuances.productionOrderLineId, lineId));
   }
   /** Re-derives the order status from its lines and pushes it to the sales order. */
   async resyncOrderTx(tx, productionOrderId, derive) {
-    const siblings = await tx.select().from(productionOrderLines).where(eq4(productionOrderLines.productionOrderId, productionOrderId));
+    const siblings = await tx.select().from(productionOrderLines).where(eq5(productionOrderLines.productionOrderId, productionOrderId));
     const patch = derive(siblings);
-    await tx.update(productionOrders).set({ ...patch, updatedAt: /* @__PURE__ */ new Date() }).where(eq4(productionOrders.id, productionOrderId));
+    await tx.update(productionOrders).set({ ...patch, updatedAt: /* @__PURE__ */ new Date() }).where(eq5(productionOrders.id, productionOrderId));
     await syncWorkOrderStatusTx(tx, productionOrderId, patch.status);
   }
   /**
@@ -2003,7 +2681,7 @@ var ProductionOrderRepository = class {
       printingOperatorId: productionOrderLines.printingOperatorId,
       cuttingOperatorId: productionOrderLines.cuttingOperatorId,
       packagingOperatorId: productionOrderLines.packagingOperatorId
-    }).from(productionOrderLines).innerJoin(productionOrders, eq4(productionOrderLines.productionOrderId, productionOrders.id)).where(and3(...conditions));
+    }).from(productionOrderLines).innerJoin(productionOrders, eq5(productionOrderLines.productionOrderId, productionOrders.id)).where(and3(...conditions));
     const heldMachines = /* @__PURE__ */ new Map();
     const heldOperators = /* @__PURE__ */ new Map();
     for (const r of rows) {
@@ -2062,7 +2740,7 @@ var ProductionOrderRepository = class {
     const { assignedRolls, ...line } = row;
     return db.transaction(async (tx) => {
       await this.releaseLineStockTx(tx, lineId);
-      const [updated] = await tx.update(productionOrderLines).set({ ...line, issuedRolls: String(assignedRolls), updatedAt: /* @__PURE__ */ new Date() }).where(eq4(productionOrderLines.id, lineId)).returning();
+      const [updated] = await tx.update(productionOrderLines).set({ ...line, issuedRolls: String(assignedRolls), updatedAt: /* @__PURE__ */ new Date() }).where(eq5(productionOrderLines.id, lineId)).returning();
       const { machineIds, operatorIds } = this.resourceIdsFromPatch(updated);
       await this.lockResourcesTx(tx, machineIds, operatorIds, lineId);
       await this.drawStockTx(tx, lineId, line.materialCode, assignedRolls, actorUserId);
@@ -2077,7 +2755,7 @@ var ProductionOrderRepository = class {
   async deleteLineTransaction(lineId, productionOrderId, derive) {
     return db.transaction(async (tx) => {
       await this.releaseLineStockTx(tx, lineId);
-      await tx.delete(productionOrderLines).where(eq4(productionOrderLines.id, lineId));
+      await tx.delete(productionOrderLines).where(eq5(productionOrderLines.id, lineId));
       await this.resyncOrderTx(tx, productionOrderId, derive);
     });
   }
@@ -2089,20 +2767,20 @@ var ProductionOrderRepository = class {
         rolls: sql`sum(${productionRollIssuances.rolls})`
       }).from(productionRollIssuances).innerJoin(
         productionOrderLines,
-        eq4(productionRollIssuances.productionOrderLineId, productionOrderLines.id)
-      ).where(eq4(productionOrderLines.productionOrderId, productionOrderId)).groupBy(productionRollIssuances.materialCode);
+        eq5(productionRollIssuances.productionOrderLineId, productionOrderLines.id)
+      ).where(eq5(productionOrderLines.productionOrderId, productionOrderId)).groupBy(productionRollIssuances.materialCode);
       for (const row of previous) {
         const rolls = Number(row.rolls);
         await tx.update(inventoryRolls).set({
           issuedRolls: sql`${inventoryRolls.issuedRolls} - ${rolls}`,
           balanceRolls: sql`${inventoryRolls.balanceRolls} + ${rolls}`,
           updatedAt: /* @__PURE__ */ new Date()
-        }).where(eq4(inventoryRolls.materialCode, row.materialCode));
+        }).where(eq5(inventoryRolls.materialCode, row.materialCode));
       }
-      const [order] = await tx.select({ workOrderId: productionOrders.workOrderId }).from(productionOrders).where(eq4(productionOrders.id, productionOrderId));
-      await tx.delete(productionOrders).where(eq4(productionOrders.id, productionOrderId));
+      const [order] = await tx.select({ workOrderId: productionOrders.workOrderId }).from(productionOrders).where(eq5(productionOrders.id, productionOrderId));
+      await tx.delete(productionOrders).where(eq5(productionOrders.id, productionOrderId));
       if (order) {
-        await tx.update(workOrders).set({ status: "initiate_production", updatedAt: /* @__PURE__ */ new Date() }).where(eq4(workOrders.id, order.workOrderId));
+        await tx.update(workOrders).set({ status: "initiate_production", updatedAt: /* @__PURE__ */ new Date() }).where(eq5(workOrders.id, order.workOrderId));
       }
     });
   }
@@ -2119,16 +2797,16 @@ var ProductionOrderRepository = class {
    */
   async applyLineChangeTransaction(lineId, compute, deriveOrderPatch2) {
     return db.transaction(async (tx) => {
-      const [locked] = await tx.select().from(productionOrderLines).where(eq4(productionOrderLines.id, lineId)).for("update");
+      const [locked] = await tx.select().from(productionOrderLines).where(eq5(productionOrderLines.id, lineId)).for("update");
       if (!locked) throw new NotFoundError("Production order line not found");
       const { linePatch, event } = compute(locked);
       const { machineIds, operatorIds } = this.resourceIdsFromPatch(linePatch);
       await this.lockResourcesTx(tx, machineIds, operatorIds, lineId);
-      const [line] = await tx.update(productionOrderLines).set({ ...linePatch, updatedAt: /* @__PURE__ */ new Date() }).where(eq4(productionOrderLines.id, lineId)).returning();
+      const [line] = await tx.update(productionOrderLines).set({ ...linePatch, updatedAt: /* @__PURE__ */ new Date() }).where(eq5(productionOrderLines.id, lineId)).returning();
       await tx.insert(productionStageEvents).values({ ...event, productionOrderLineId: lineId });
-      const siblings = await tx.select().from(productionOrderLines).where(eq4(productionOrderLines.productionOrderId, line.productionOrderId));
+      const siblings = await tx.select().from(productionOrderLines).where(eq5(productionOrderLines.productionOrderId, line.productionOrderId));
       const orderPatch = deriveOrderPatch2(siblings);
-      await tx.update(productionOrders).set({ ...orderPatch, updatedAt: /* @__PURE__ */ new Date() }).where(eq4(productionOrders.id, line.productionOrderId));
+      await tx.update(productionOrders).set({ ...orderPatch, updatedAt: /* @__PURE__ */ new Date() }).where(eq5(productionOrders.id, line.productionOrderId));
       await syncWorkOrderStatusTx(tx, line.productionOrderId, orderPatch.status);
       return line;
     });
@@ -2150,20 +2828,20 @@ var ProductionOrderRepository = class {
       await tx.update(productionOrderLines).set({
         issuedRolls: sql`${productionOrderLines.issuedRolls} + ${rolls}`,
         updatedAt: /* @__PURE__ */ new Date()
-      }).where(eq4(productionOrderLines.id, lineId));
+      }).where(eq5(productionOrderLines.id, lineId));
       await tx.update(inventoryRolls).set({
         issuedRolls: sql`${inventoryRolls.issuedRolls} + ${rolls}`,
         balanceRolls: sql`${inventoryRolls.balanceRolls} - ${rolls}`,
         updatedAt: /* @__PURE__ */ new Date()
-      }).where(eq4(inventoryRolls.materialCode, materialCode));
+      }).where(eq5(inventoryRolls.materialCode, materialCode));
       return issuance;
     });
   }
   async findLineIssuances(lineId, opts) {
-    return db.select().from(productionRollIssuances).where(eq4(productionRollIssuances.productionOrderLineId, Number(lineId))).orderBy(desc(productionRollIssuances.createdAt)).limit(opts?.limit ?? DEFAULT_HISTORY_LIMIT).offset(opts?.offset ?? 0);
+    return db.select().from(productionRollIssuances).where(eq5(productionRollIssuances.productionOrderLineId, Number(lineId))).orderBy(desc2(productionRollIssuances.createdAt)).limit(opts?.limit ?? DEFAULT_HISTORY_LIMIT).offset(opts?.offset ?? 0);
   }
   async findLineEvents(lineId, opts) {
-    return db.select().from(productionStageEvents).where(eq4(productionStageEvents.productionOrderLineId, Number(lineId))).orderBy(desc(productionStageEvents.createdAt)).limit(opts?.limit ?? DEFAULT_HISTORY_LIMIT).offset(opts?.offset ?? 0);
+    return db.select().from(productionStageEvents).where(eq5(productionStageEvents.productionOrderLineId, Number(lineId))).orderBy(desc2(productionStageEvents.createdAt)).limit(opts?.limit ?? DEFAULT_HISTORY_LIMIT).offset(opts?.offset ?? 0);
   }
   async findOrderEvents(productionOrderId, opts) {
     return db.select({
@@ -2177,7 +2855,7 @@ var ProductionOrderRepository = class {
       actorUserId: productionStageEvents.actorUserId,
       note: productionStageEvents.note,
       createdAt: productionStageEvents.createdAt
-    }).from(productionStageEvents).innerJoin(productionOrderLines, eq4(productionStageEvents.productionOrderLineId, productionOrderLines.id)).where(eq4(productionOrderLines.productionOrderId, Number(productionOrderId))).orderBy(desc(productionStageEvents.createdAt)).limit(opts?.limit ?? DEFAULT_HISTORY_LIMIT).offset(opts?.offset ?? 0);
+    }).from(productionStageEvents).innerJoin(productionOrderLines, eq5(productionStageEvents.productionOrderLineId, productionOrderLines.id)).where(eq5(productionOrderLines.productionOrderId, Number(productionOrderId))).orderBy(desc2(productionStageEvents.createdAt)).limit(opts?.limit ?? DEFAULT_HISTORY_LIMIT).offset(opts?.offset ?? 0);
   }
   /**
    * Every machine and operator currently held by an **active** production line, with the
@@ -2204,7 +2882,7 @@ var ProductionOrderRepository = class {
       cuttingMachineId: productionOrderLines.cuttingMachineId,
       cuttingOperatorId: productionOrderLines.cuttingOperatorId,
       packagingOperatorId: productionOrderLines.packagingOperatorId
-    }).from(productionOrderLines).innerJoin(productionOrders, eq4(productionOrderLines.productionOrderId, productionOrders.id)).where(and3(...conditions));
+    }).from(productionOrderLines).innerJoin(productionOrders, eq5(productionOrderLines.productionOrderId, productionOrders.id)).where(and3(...conditions));
   }
   /**
    * Every machine/operator assignment that exists, with the state needed to classify how
@@ -2227,7 +2905,7 @@ var ProductionOrderRepository = class {
       cuttingMachineId: productionOrderLines.cuttingMachineId,
       cuttingOperatorId: productionOrderLines.cuttingOperatorId,
       packagingOperatorId: productionOrderLines.packagingOperatorId
-    }).from(productionOrderLines).innerJoin(productionOrders, eq4(productionOrderLines.productionOrderId, productionOrders.id));
+    }).from(productionOrderLines).innerJoin(productionOrders, eq5(productionOrderLines.productionOrderId, productionOrders.id));
   }
   /** Total rolls drawn from inventory by every line of one production order, per material. */
   async findOrderIssuanceTotals(productionOrderId) {
@@ -2236,8 +2914,8 @@ var ProductionOrderRepository = class {
       rolls: sql`sum(${productionRollIssuances.rolls})`
     }).from(productionRollIssuances).innerJoin(
       productionOrderLines,
-      eq4(productionRollIssuances.productionOrderLineId, productionOrderLines.id)
-    ).where(eq4(productionOrderLines.productionOrderId, Number(productionOrderId))).groupBy(productionRollIssuances.materialCode);
+      eq5(productionRollIssuances.productionOrderLineId, productionOrderLines.id)
+    ).where(eq5(productionOrderLines.productionOrderId, Number(productionOrderId))).groupBy(productionRollIssuances.materialCode);
   }
   /** Work orders still in production (not completed) that don't yet have a production order. */
   async findEligibleWorkOrders() {
@@ -2248,16 +2926,64 @@ var ProductionOrderRepository = class {
       orderDate: workOrders.orderDate,
       dueDate: workOrders.dueDate,
       totalQty: workOrders.totalQty,
+      productType: workOrders.productType,
       brandId: brands.id,
       brandName: brands.name,
       companyId: companies.id,
       companyName: companies.name
-    }).from(workOrders).leftJoin(brands, eq4(workOrders.brandId, brands.id)).leftJoin(companies, eq4(brands.companyId, companies.id)).where(
+    }).from(workOrders).leftJoin(brands, eq5(workOrders.brandId, brands.id)).leftJoin(companies, eq5(brands.companyId, companies.id)).where(
       and3(
-        eq4(workOrders.status, "initiate_production"),
+        eq5(workOrders.status, "initiate_production"),
         sql`NOT EXISTS (SELECT 1 FROM ${productionOrders} WHERE ${productionOrders.workOrderId} = ${workOrders.id})`
       )
-    ).orderBy(desc(workOrders.createdAt));
+    ).orderBy(desc2(workOrders.createdAt));
+  }
+  /**
+   * Reconciles stock for a finished production line:
+   * Records usedRolls, usedWeight, extraRollsReturned, extraWeight, and reconciledAt.
+   * Automatically credits extraRollsReturned rolls back to main inventory (inventory_rolls)
+   * and writes an append-only inventory_roll_movements history entry.
+   */
+  async reconcileLineStockTransaction(lineId, data) {
+    return db.transaction(async (tx) => {
+      const [line] = await tx.select().from(productionOrderLines).where(eq5(productionOrderLines.id, lineId));
+      if (!line) throw new NotFoundError("Production order line not found");
+      const previousReturned = Number(line.extraRollsReturned ?? 0);
+      const newReturned = Number(data.extraRollsReturned);
+      const deltaReturned = newReturned - previousReturned;
+      const [updatedLine] = await tx.update(productionOrderLines).set({
+        usedRolls: String(data.usedRolls),
+        usedWeight: String(data.usedWeight),
+        extraRollsReturned: String(data.extraRollsReturned),
+        extraWeight: String(data.extraWeight),
+        reconciledAt: /* @__PURE__ */ new Date(),
+        updatedAt: /* @__PURE__ */ new Date()
+      }).where(eq5(productionOrderLines.id, lineId)).returning();
+      if (deltaReturned !== 0 && line.materialCode) {
+        const [stock] = await tx.select().from(inventoryRolls).where(eq5(inventoryRolls.materialCode, line.materialCode));
+        if (stock) {
+          const newIssued = Math.max(0, Number(stock.issuedRolls) - deltaReturned);
+          const newBalance = Math.max(0, Number(stock.balanceRolls) + deltaReturned);
+          await tx.update(inventoryRolls).set({
+            issuedRolls: String(newIssued),
+            balanceRolls: String(newBalance),
+            updatedAt: /* @__PURE__ */ new Date()
+          }).where(eq5(inventoryRolls.id, stock.id));
+          await tx.insert(inventoryRollMovements).values({
+            inventoryRollId: stock.id,
+            materialCode: line.materialCode,
+            movementType: "production_release",
+            rolls: String(deltaReturned),
+            balanceAfter: String(newBalance),
+            referenceType: "production_order_line",
+            referenceId: lineId,
+            note: `Stock reconciliation return for ${line.labelType} (${data.extraRollsReturned} rolls returned, ${data.extraWeight} kg extra)`,
+            actorUserId: data.actorUserId ?? null
+          });
+        }
+      }
+      return updatedLine;
+    });
   }
 };
 var productionOrderRepository = new ProductionOrderRepository();
@@ -2392,35 +3118,35 @@ var MachineController = class {
 var machineController = new MachineController();
 
 // src/api/validations/machines.validation.ts
-import { z as z8 } from "zod";
-var createMachineSchema = z8.object({
-  body: z8.object({
-    name: z8.string().min(1, "Name is required"),
-    machineCode: z8.string().min(1, "Machine code is required"),
-    machineName: z8.string().min(1, "Machine name is required"),
-    machineType: z8.enum(["Printing", "Woven", "Cutting", "Packaging", "Other"]).default("Other"),
-    productType: z8.enum(["printed", "woven", "both"]).default("both"),
-    machineOperatorId: z8.coerce.number().int().positive().optional(),
-    capacityPerHour: z8.coerce.number().int().min(0).optional(),
-    status: z8.enum(["Active", "Inactive"]).default("Active")
+import { z as z9 } from "zod";
+var createMachineSchema = z9.object({
+  body: z9.object({
+    name: z9.string().min(1, "Name is required"),
+    machineCode: z9.string().min(1, "Machine code is required"),
+    machineName: z9.string().min(1, "Machine name is required"),
+    machineType: z9.enum(["Printing", "Woven", "Cutting", "Packaging", "Other"]).default("Other"),
+    productType: z9.enum(["printed", "woven", "both"]).default("both"),
+    machineOperatorId: z9.coerce.number().int().positive().optional(),
+    capacityPerHour: z9.coerce.number().int().min(0).optional(),
+    status: z9.enum(["Active", "Inactive"]).default("Active")
   })
 });
-var updateMachineSchema = z8.object({
-  body: z8.object({
-    name: z8.string().min(1, "Name is required").optional(),
-    machineCode: z8.string().min(1, "Machine code is required").optional(),
-    machineName: z8.string().min(1, "Machine name is required").optional(),
-    machineType: z8.enum(["Printing", "Woven", "Cutting", "Packaging", "Other"]).optional(),
-    productType: z8.enum(["printed", "woven", "both"]).optional(),
-    machineOperatorId: z8.coerce.number().int().positive().optional(),
-    capacityPerHour: z8.coerce.number().int().min(0).optional(),
-    status: z8.enum(["Active", "Inactive"]).optional(),
-    isActive: z8.coerce.boolean().optional()
+var updateMachineSchema = z9.object({
+  body: z9.object({
+    name: z9.string().min(1, "Name is required").optional(),
+    machineCode: z9.string().min(1, "Machine code is required").optional(),
+    machineName: z9.string().min(1, "Machine name is required").optional(),
+    machineType: z9.enum(["Printing", "Woven", "Cutting", "Packaging", "Other"]).optional(),
+    productType: z9.enum(["printed", "woven", "both"]).optional(),
+    machineOperatorId: z9.coerce.number().int().positive().optional(),
+    capacityPerHour: z9.coerce.number().int().min(0).optional(),
+    status: z9.enum(["Active", "Inactive"]).optional(),
+    isActive: z9.coerce.boolean().optional()
   })
 });
 
 // src/api/routes/machines.routes.ts
-var router6 = Router6();
+var router6 = Router7();
 router6.get("/", validateQuery(listMachinesQuerySchema), machineController.getMachines);
 router6.get("/:id", validateParams(idParamsSchema), machineController.getMachine);
 router6.post("/", validateRequest(createMachineSchema), machineController.createMachine);
@@ -2429,15 +3155,15 @@ router6.delete("/:id", validateParams(idParamsSchema), machineController.deleteM
 var machines_routes_default = router6;
 
 // src/api/routes/operators.routes.ts
-import { Router as Router7 } from "express";
+import { Router as Router8 } from "express";
 
 // src/api/repositories/operator.repository.ts
-import { eq as eq5, asc as asc4, and as and4, sql as sql2, inArray as inArray3 } from "drizzle-orm";
+import { eq as eq6, asc as asc4, and as and4, sql as sql2, inArray as inArray3 } from "drizzle-orm";
 var OperatorRepository = class {
   async findAll(filters) {
     const conditions = [];
-    if (filters?.designation) conditions.push(eq5(operators.designation, filters.designation));
-    if (filters?.operatorType) conditions.push(eq5(operators.operatorType, filters.operatorType));
+    if (filters?.designation) conditions.push(eq6(operators.designation, filters.designation));
+    if (filters?.operatorType) conditions.push(eq6(operators.operatorType, filters.operatorType));
     if (filters?.productType) {
       conditions.push(inArray3(operators.operatorType, [filters.productType, "both"]));
     }
@@ -2445,11 +3171,11 @@ var OperatorRepository = class {
       const q = `%${filters.search}%`;
       conditions.push(sql2`(${operators.name} ILIKE ${q} OR ${operators.employeeCode} ILIKE ${q})`);
     }
-    if (!filters?.includeInactive) conditions.push(eq5(operators.isActive, true));
+    if (!filters?.includeInactive) conditions.push(eq6(operators.isActive, true));
     return db.select().from(operators).where(conditions.length > 0 ? and4(...conditions) : void 0).orderBy(asc4(operators.name));
   }
   async findById(id) {
-    const [operator] = await db.select().from(operators).where(eq5(operators.id, Number(id)));
+    const [operator] = await db.select().from(operators).where(eq6(operators.id, Number(id)));
     return operator;
   }
   async create(data) {
@@ -2457,11 +3183,11 @@ var OperatorRepository = class {
     return operator;
   }
   async update(id, data) {
-    const [operator] = await db.update(operators).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq5(operators.id, Number(id))).returning();
+    const [operator] = await db.update(operators).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq6(operators.id, Number(id))).returning();
     return operator;
   }
   async softDelete(id) {
-    const [operator] = await db.update(operators).set({ isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(eq5(operators.id, Number(id))).returning();
+    const [operator] = await db.update(operators).set({ isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(eq6(operators.id, Number(id))).returning();
     return operator;
   }
 };
@@ -2555,35 +3281,35 @@ var OperatorController = class {
 var operatorController = new OperatorController();
 
 // src/api/validations/operators.validation.ts
-import { z as z9 } from "zod";
-var operatorTypeEnum2 = z9.enum(["printed", "woven", "both"]);
-var avatarUrlSchema = z9.string().trim().max(1e6).optional().or(z9.literal(""));
-var createOperatorSchema = z9.object({
-  body: z9.object({
-    name: z9.string().min(1, "Name is required"),
-    employeeCode: z9.string().optional(),
-    designation: z9.enum(["Printing", "Weaving", "Cutting", "Packaging"]).default("Printing"),
+import { z as z10 } from "zod";
+var operatorTypeEnum2 = z10.enum(["printed", "woven", "both"]);
+var avatarUrlSchema = z10.string().trim().max(1e6).optional().or(z10.literal(""));
+var createOperatorSchema = z10.object({
+  body: z10.object({
+    name: z10.string().min(1, "Name is required"),
+    employeeCode: z10.string().optional(),
+    designation: z10.enum(["Printing", "Weaving", "Cutting", "Packaging"]).default("Printing"),
     operatorType: operatorTypeEnum2.default("both"),
     avatarUrl: avatarUrlSchema,
-    shift: z9.string().optional(),
-    status: z9.enum(["Active", "Inactive"]).default("Active")
+    shift: z10.string().optional(),
+    status: z10.enum(["Active", "Inactive"]).default("Active")
   })
 });
-var updateOperatorSchema = z9.object({
-  body: z9.object({
-    name: z9.string().min(1, "Name is required").optional(),
-    employeeCode: z9.string().optional(),
-    designation: z9.enum(["Printing", "Weaving", "Cutting", "Packaging"]).optional(),
+var updateOperatorSchema = z10.object({
+  body: z10.object({
+    name: z10.string().min(1, "Name is required").optional(),
+    employeeCode: z10.string().optional(),
+    designation: z10.enum(["Printing", "Weaving", "Cutting", "Packaging"]).optional(),
     operatorType: operatorTypeEnum2.optional(),
     avatarUrl: avatarUrlSchema,
-    shift: z9.string().optional(),
-    status: z9.enum(["Active", "Inactive"]).optional(),
-    isActive: z9.coerce.boolean().optional()
+    shift: z10.string().optional(),
+    status: z10.enum(["Active", "Inactive"]).optional(),
+    isActive: z10.coerce.boolean().optional()
   })
 });
 
 // src/api/routes/operators.routes.ts
-var router7 = Router7();
+var router7 = Router8();
 router7.get("/", validateQuery(listOperatorsQuerySchema), operatorController.getOperators);
 router7.get("/:id", validateParams(idParamsSchema), operatorController.getOperator);
 router7.post("/", validateRequest(createOperatorSchema), operatorController.createOperator);
@@ -2592,23 +3318,23 @@ router7.delete("/:id", validateParams(idParamsSchema), operatorController.delete
 var operators_routes_default = router7;
 
 // src/api/routes/users.routes.ts
-import { Router as Router8 } from "express";
+import { Router as Router9 } from "express";
 
 // src/api/repositories/user.repository.ts
-import { eq as eq6, asc as asc5, and as and5 } from "drizzle-orm";
+import { eq as eq7, asc as asc5, and as and5 } from "drizzle-orm";
 var UserRepository = class {
   async findAll(filters) {
     const conditions = [];
-    if (filters?.role) conditions.push(eq6(users.role, filters.role));
-    if (!filters?.includeInactive) conditions.push(eq6(users.isActive, true));
+    if (filters?.role) conditions.push(eq7(users.role, filters.role));
+    if (!filters?.includeInactive) conditions.push(eq7(users.isActive, true));
     return db.select().from(users).where(conditions.length > 0 ? and5(...conditions) : void 0).orderBy(asc5(users.name));
   }
   async findById(id) {
-    const [user] = await db.select().from(users).where(eq6(users.id, Number(id)));
+    const [user] = await db.select().from(users).where(eq7(users.id, Number(id)));
     return user;
   }
   async findByEmail(email) {
-    const [user] = await db.select().from(users).where(eq6(users.email, email));
+    const [user] = await db.select().from(users).where(eq7(users.email, email));
     return user;
   }
   async create(data) {
@@ -2616,11 +3342,11 @@ var UserRepository = class {
     return user;
   }
   async update(id, data) {
-    const [user] = await db.update(users).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq6(users.id, Number(id))).returning();
+    const [user] = await db.update(users).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq7(users.id, Number(id))).returning();
     return user;
   }
   async softDelete(id) {
-    const [user] = await db.update(users).set({ isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(eq6(users.id, Number(id))).returning();
+    const [user] = await db.update(users).set({ isActive: false, updatedAt: /* @__PURE__ */ new Date() }).where(eq7(users.id, Number(id))).returning();
     return user;
   }
 };
@@ -2701,28 +3427,28 @@ var UserController = class {
 var userController = new UserController();
 
 // src/api/validations/users.validation.ts
-import { z as z10 } from "zod";
-var userRoleSchema = z10.enum(["office_staff", "production_manager", "production_operator"]);
-var createUserSchema = z10.object({
-  body: z10.object({
-    name: z10.string().trim().min(1, "Name is required"),
-    employeeCode: z10.string().optional(),
-    email: z10.string().email("Must be a valid email").optional(),
+import { z as z11 } from "zod";
+var userRoleSchema = z11.enum(["office_staff", "production_manager", "production_operator"]);
+var createUserSchema = z11.object({
+  body: z11.object({
+    name: z11.string().trim().min(1, "Name is required"),
+    employeeCode: z11.string().optional(),
+    email: z11.string().email("Must be a valid email").optional(),
     role: userRoleSchema
   })
 });
-var updateUserSchema = z10.object({
-  body: z10.object({
-    name: z10.string().trim().min(1).optional(),
-    employeeCode: z10.string().optional(),
-    email: z10.string().email("Must be a valid email").optional(),
+var updateUserSchema = z11.object({
+  body: z11.object({
+    name: z11.string().trim().min(1).optional(),
+    employeeCode: z11.string().optional(),
+    email: z11.string().email("Must be a valid email").optional(),
     role: userRoleSchema.optional(),
-    isActive: z10.coerce.boolean().optional()
+    isActive: z11.coerce.boolean().optional()
   })
 });
 
 // src/api/routes/users.routes.ts
-var router8 = Router8();
+var router8 = Router9();
 router8.get("/", validateQuery(listUsersQuerySchema), userController.getUsers);
 router8.get("/:id", validateParams(idParamsSchema), userController.getUser);
 router8.post("/", validateRequest(createUserSchema), userController.createUser);
@@ -2731,10 +3457,10 @@ router8.delete("/:id", validateParams(idParamsSchema), userController.deleteUser
 var users_routes_default = router8;
 
 // src/api/routes/work-orders.routes.ts
-import { Router as Router9 } from "express";
+import { Router as Router10 } from "express";
 
 // src/api/repositories/work-order.repository.ts
-import { eq as eq7, desc as desc2, and as and6, sql as sql3 } from "drizzle-orm";
+import { eq as eq8, desc as desc3, and as and6, sql as sql3 } from "drizzle-orm";
 var workOrderWithBrandSelect = {
   id: workOrders.id,
   soNumber: workOrders.soNumber,
@@ -2744,6 +3470,8 @@ var workOrderWithBrandSelect = {
   totalQty: workOrders.totalQty,
   brandId: workOrders.brandId,
   comment: workOrders.comment,
+  priority: workOrders.priority,
+  orderType: workOrders.orderType,
   imageUrl: workOrders.imageUrl,
   status: workOrders.status,
   productType: workOrders.productType,
@@ -2761,7 +3489,8 @@ var workOrderWithBrandSelect = {
   pick: wovenWorkOrderDetails.pick,
   repeat: wovenWorkOrderDetails.repeat,
   density: wovenWorkOrderDetails.density,
-  extra: wovenWorkOrderDetails.extra
+  extra: wovenWorkOrderDetails.extra,
+  sizeLabels: wovenWorkOrderDetails.sizeLabels
 };
 var WorkOrderRepository = class {
   async findAll(filters) {
@@ -2773,28 +3502,28 @@ var WorkOrderRepository = class {
     if (filters?.designCode) {
       conditions.push(sql3`${wovenWorkOrderDetails.designCode} ILIKE ${"%" + filters.designCode + "%"}`);
     }
-    if (filters?.status) conditions.push(eq7(workOrders.status, filters.status));
-    if (filters?.productType) conditions.push(eq7(workOrders.productType, filters.productType));
+    if (filters?.status) conditions.push(eq8(workOrders.status, filters.status));
+    if (filters?.productType) conditions.push(eq8(workOrders.productType, filters.productType));
     if (filters?.startDate && filters?.endDate) {
       conditions.push(sql3`${workOrders.orderDate} BETWEEN ${filters.startDate} AND ${filters.endDate}`);
     }
-    return db.select(workOrderWithBrandSelect).from(workOrders).leftJoin(brands, eq7(workOrders.brandId, brands.id)).leftJoin(companies, eq7(brands.companyId, companies.id)).leftJoin(wovenWorkOrderDetails, eq7(wovenWorkOrderDetails.workOrderId, workOrders.id)).where(conditions.length > 0 ? and6(...conditions) : void 0).orderBy(desc2(workOrders.createdAt));
+    return db.select(workOrderWithBrandSelect).from(workOrders).leftJoin(brands, eq8(workOrders.brandId, brands.id)).leftJoin(companies, eq8(brands.companyId, companies.id)).leftJoin(wovenWorkOrderDetails, eq8(wovenWorkOrderDetails.workOrderId, workOrders.id)).where(conditions.length > 0 ? and6(...conditions) : void 0).orderBy(desc3(workOrders.createdAt));
   }
   async findById(id) {
-    const [workOrder] = await db.select(workOrderWithBrandSelect).from(workOrders).leftJoin(brands, eq7(workOrders.brandId, brands.id)).leftJoin(companies, eq7(brands.companyId, companies.id)).leftJoin(wovenWorkOrderDetails, eq7(wovenWorkOrderDetails.workOrderId, workOrders.id)).where(eq7(workOrders.id, Number(id)));
+    const [workOrder] = await db.select(workOrderWithBrandSelect).from(workOrders).leftJoin(brands, eq8(workOrders.brandId, brands.id)).leftJoin(companies, eq8(brands.companyId, companies.id)).leftJoin(wovenWorkOrderDetails, eq8(wovenWorkOrderDetails.workOrderId, workOrders.id)).where(eq8(workOrders.id, Number(id)));
     return workOrder;
   }
   /** The loom spec for a woven order, or undefined for a printed one. */
   async findWovenDetail(workOrderId) {
-    const [row] = await db.select().from(wovenWorkOrderDetails).where(eq7(wovenWorkOrderDetails.workOrderId, Number(workOrderId)));
+    const [row] = await db.select().from(wovenWorkOrderDetails).where(eq8(wovenWorkOrderDetails.workOrderId, Number(workOrderId)));
     return row;
   }
   async findByDesignCode(designCode) {
-    const [row] = await db.select().from(wovenWorkOrderDetails).where(eq7(wovenWorkOrderDetails.designCode, designCode));
+    const [row] = await db.select().from(wovenWorkOrderDetails).where(eq8(wovenWorkOrderDetails.designCode, designCode));
     return row;
   }
   async findRawById(id) {
-    const [workOrder] = await db.select().from(workOrders).where(eq7(workOrders.id, Number(id)));
+    const [workOrder] = await db.select().from(workOrders).where(eq8(workOrders.id, Number(id)));
     return workOrder;
   }
   async create(data) {
@@ -2813,18 +3542,104 @@ var WorkOrderRepository = class {
     });
   }
   async upsertWovenDetail(workOrderId, detail) {
-    const [row] = await db.update(wovenWorkOrderDetails).set({ ...detail, updatedAt: /* @__PURE__ */ new Date() }).where(eq7(wovenWorkOrderDetails.workOrderId, workOrderId)).returning();
+    const [row] = await db.update(wovenWorkOrderDetails).set({ ...detail, updatedAt: /* @__PURE__ */ new Date() }).where(eq8(wovenWorkOrderDetails.workOrderId, workOrderId)).returning();
     return row;
   }
   async update(id, data) {
-    const [workOrder] = await db.update(workOrders).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq7(workOrders.id, Number(id))).returning();
+    const [workOrder] = await db.update(workOrders).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq8(workOrders.id, Number(id))).returning();
     return workOrder;
   }
   async delete(id) {
-    await db.delete(workOrders).where(eq7(workOrders.id, Number(id)));
+    await db.delete(workOrders).where(eq8(workOrders.id, Number(id)));
   }
 };
 var workOrderRepository = new WorkOrderRepository();
+
+// src/api/services/mail.service.ts
+import nodemailer from "nodemailer";
+var MailService = class {
+  transporter = null;
+  getTransporter() {
+    if (!this.transporter) {
+      this.transporter = nodemailer.createTransport({
+        host: env.SMTP_HOST,
+        port: env.SMTP_PORT,
+        secure: env.SMTP_SECURE,
+        auth: {
+          user: env.SMTP_USER,
+          pass: env.SMTP_PASS
+        }
+      });
+    }
+    return this.transporter;
+  }
+  /**
+   * Sends an email to ceo@3qfacility.com when a production order is marked as complete.
+   */
+  async sendProductionCompletedEmail(orderData) {
+    try {
+      const recipient = env.CEO_EMAIL;
+      const subject = `Order Complete Notification - ${orderData.productionNumber}${orderData.soNumber ? ` (SO: ${orderData.soNumber})` : ""}`;
+      const customMessage = `Dear recipient, your order is complete. Please share PO copy if not so that we will dispatch your order. If already shared, stay calm, we will dispatch your order shortly.`;
+      const htmlContent = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #ffffff;">
+          <h2 style="color: #0f172a; margin-top: 0; font-size: 20px;">Order Completed</h2>
+          <p style="font-size: 15px; color: #334155; line-height: 1.6; background-color: #f8fafc; padding: 16px; border-radius: 6px; border-left: 4px solid #0284c7;">
+            ${customMessage}
+          </p>
+          <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+          <h3 style="color: #1e293b; font-size: 16px; margin-bottom: 12px;">Order Summary:</h3>
+          <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 14px;">
+            <tr>
+              <td style="padding: 8px 0; color: #64748b; font-weight: bold; width: 40%;">Production Number:</td>
+              <td style="padding: 8px 0; color: #0f172a; font-weight: 600;">${orderData.productionNumber}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; color: #64748b; font-weight: bold;">Sales Order (SO):</td>
+              <td style="padding: 8px 0; color: #0f172a;">${orderData.soNumber || "N/A"}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; color: #64748b; font-weight: bold;">PO Number:</td>
+              <td style="padding: 8px 0; color: #0f172a;">${orderData.poNumber || "N/A"}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; color: #64748b; font-weight: bold;">Company / Brand:</td>
+              <td style="padding: 8px 0; color: #0f172a;">${orderData.companyName || "N/A"}${orderData.brandName ? ` / ${orderData.brandName}` : ""}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; color: #64748b; font-weight: bold;">Total Quantity:</td>
+              <td style="padding: 8px 0; color: #0f172a;">${orderData.totalQty != null ? Number(orderData.totalQty).toLocaleString() : "N/A"}</td>
+            </tr>
+          </table>
+          <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #f1f5f9; font-size: 12px; color: #94a3b8; text-align: center;">
+            Sent automatically by 3Q Facility ERP System
+          </div>
+        </div>
+      `;
+      const info = await this.getTransporter().sendMail({
+        from: env.SMTP_FROM,
+        to: recipient,
+        subject,
+        text: `${customMessage}
+
+Order Details:
+- Production Number: ${orderData.productionNumber}
+- SO Number: ${orderData.soNumber || "N/A"}
+- PO Number: ${orderData.poNumber || "N/A"}
+- Company: ${orderData.companyName || "N/A"}
+- Brand: ${orderData.brandName || "N/A"}
+- Quantity: ${orderData.totalQty != null ? Number(orderData.totalQty).toLocaleString() : "N/A"}`,
+        html: htmlContent
+      });
+      console.log(`[MailService] Production completion email sent to ${recipient}: ${info.messageId}`);
+      return true;
+    } catch (error) {
+      console.error("[MailService] Failed to send production completion email:", error);
+      return false;
+    }
+  }
+};
+var mailService = new MailService();
 
 // src/api/services/work-order.service.ts
 var WorkOrderService = class {
@@ -2855,6 +3670,8 @@ var WorkOrderService = class {
       totalQty: data.totalQty,
       brandId: data.brandId,
       comment: data.comment,
+      priority: data.priority ?? "normal",
+      orderType: data.orderType ?? "normal order",
       imageUrl: data.imageUrl?.trim() ? data.imageUrl.trim() : null
     };
     if (data.productType === "woven") {
@@ -2871,7 +3688,8 @@ var WorkOrderService = class {
         density: data.wovenDetail.density,
         // Decimal columns take strings through Drizzle.
         repeat: String(data.wovenDetail.repeat),
-        extra: String(data.wovenDetail.extra ?? 0)
+        extra: String(data.wovenDetail.extra ?? 0),
+        sizeLabels: data.wovenDetail.sizeLabels ?? []
       });
     }
     return workOrderRepository.create({ ...header, productType: "printed" });
@@ -2903,15 +3721,26 @@ var WorkOrderService = class {
         400
       );
     }
-    return workOrderRepository.update(id, {
+    const updated = await workOrderRepository.update(id, {
       dcNumber: data.dcNumber,
       lcNumber: data.lcNumber,
       fbrInvoiceNumber: data.fbrInvoiceNumber,
       dispatchedDate: data.dispatchedDate,
       dispatchedQty: data.dispatchedQty,
+      ...data.imageUrl !== void 0 ? { imageUrl: data.imageUrl } : {},
       // Paperwork complete — this is the only place the status becomes `dispatched`.
       status: "dispatched"
     });
+    const productionOrder = await productionOrderRepository.findByWorkOrderId(id);
+    mailService.sendProductionCompletedEmail({
+      productionNumber: productionOrder?.productionNumber || `SO-${existing.soNumber}`,
+      soNumber: existing.soNumber,
+      poNumber: existing.poNumber,
+      totalQty: existing.totalQty
+    }).catch((err) => {
+      console.error("[WorkOrderService] Error sending dispatch email:", err);
+    });
+    return updated;
   }
   /**
    * Commercial fields only. **Status is never accepted from the client** — it is derived
@@ -2934,19 +3763,9 @@ var WorkOrderService = class {
       wovenDetail,
       ...commercial
     } = data;
-    const productionFinished = existing.status === "complete" || existing.status === "dispatched";
-    if (productionFinished && Object.keys(commercial).length > 0) {
-      throw new ApiError(
-        "This work order is finished \u2014 only the dispatch paperwork (DC number, LC number, FBR invoice, date, quantity) can still be edited",
-        400
-      );
-    }
     if (wovenDetail && Object.keys(wovenDetail).length > 0) {
       if (existing.productType !== "woven") {
         throw new ApiError("Only a woven work order carries a design specification", 400);
-      }
-      if (productionFinished) {
-        throw new ApiError("This work order is finished \u2014 its design specification is locked", 400);
       }
       if (wovenDetail.designCode) {
         const clash = await workOrderRepository.findByDesignCode(wovenDetail.designCode);
@@ -2959,17 +3778,9 @@ var WorkOrderService = class {
         ...wovenDetail.pick !== void 0 ? { pick: wovenDetail.pick } : {},
         ...wovenDetail.density !== void 0 ? { density: wovenDetail.density } : {},
         ...wovenDetail.repeat !== void 0 ? { repeat: String(wovenDetail.repeat) } : {},
-        ...wovenDetail.extra !== void 0 ? { extra: String(wovenDetail.extra) } : {}
+        ...wovenDetail.extra !== void 0 ? { extra: String(wovenDetail.extra) } : {},
+        ...wovenDetail.sizeLabels !== void 0 ? { sizeLabels: wovenDetail.sizeLabels } : {}
       });
-    }
-    if (data.totalQty !== void 0 && data.totalQty !== existing.totalQty) {
-      const productionOrder = await productionOrderRepository.findByWorkOrderId(id);
-      if (productionOrder) {
-        throw new ApiError(
-          `Cannot change quantity: production order ${productionOrder.productionNumber} was raised against this work order`,
-          400
-        );
-      }
     }
     return workOrderRepository.update(id, {
       ...commercial,
@@ -2983,15 +3794,9 @@ var WorkOrderService = class {
   async deleteWorkOrder(id) {
     const existing = await workOrderRepository.findRawById(id);
     if (!existing) throw new NotFoundError(Messages.notFound(Entity.WORK_ORDER));
-    if (existing.status !== "initiate_production") {
-      throw new ApiError("Cannot delete a work order that is already in production", 400);
-    }
     const productionOrder = await productionOrderRepository.findByWorkOrderId(id);
     if (productionOrder) {
-      throw new ApiError(
-        `Cannot delete this sales order: production order ${productionOrder.productionNumber} was raised against it`,
-        400
-      );
+      await productionOrderRepository.releaseOrderInventoryTransaction(Number(productionOrder.id));
     }
     await workOrderRepository.delete(id);
   }
@@ -3040,27 +3845,200 @@ var WorkOrderController = class {
 };
 var workOrderController = new WorkOrderController();
 
+// src/api/repositories/production-run.repository.ts
+import { and as and7, desc as desc4, eq as eq9, gte, isNull, sql as sql4 } from "drizzle-orm";
+var ProductionRunRepository = class {
+  /** Append-only: only ever inserts, never updates a prior run. */
+  async create(data) {
+    const [run] = await db.insert(productionRuns).values(data).returning();
+    return run;
+  }
+  /** Full history for a sale order, newest first, with machine/operator/user names joined. */
+  async findBySaleOrderId(saleOrderId) {
+    return db.select({
+      id: productionRuns.id,
+      saleOrderId: productionRuns.saleOrderId,
+      productId: productionRuns.productId,
+      machineId: productionRuns.machineId,
+      machineName: machines.machineName,
+      operatorId: productionRuns.operatorId,
+      operatorName: operators.name,
+      quantityProduced: productionRuns.quantityProduced,
+      runReason: productionRuns.runReason,
+      notes: productionRuns.notes,
+      producedAt: productionRuns.producedAt,
+      createdBy: productionRuns.createdBy,
+      createdByName: users.name,
+      createdAt: productionRuns.createdAt
+    }).from(productionRuns).leftJoin(machines, eq9(productionRuns.machineId, machines.id)).leftJoin(operators, eq9(productionRuns.operatorId, operators.id)).leftJoin(users, eq9(productionRuns.createdBy, users.id)).where(eq9(productionRuns.saleOrderId, saleOrderId)).orderBy(desc4(productionRuns.producedAt));
+  }
+  /** Derived Total Produced = SUM(quantity_produced) across every run. */
+  async getTotalProduced(saleOrderId) {
+    const [row] = await db.select({ total: sql4`coalesce(sum(${productionRuns.quantityProduced}), 0)` }).from(productionRuns).where(eq9(productionRuns.saleOrderId, saleOrderId));
+    return Number(row?.total ?? 0);
+  }
+  async getMachineBreakdown(saleOrderId) {
+    return db.select({
+      machineId: productionRuns.machineId,
+      machineName: machines.machineName,
+      totalQuantity: sql4`coalesce(sum(${productionRuns.quantityProduced}), 0)`,
+      runCount: sql4`cast(count(*) as int)`
+    }).from(productionRuns).leftJoin(machines, eq9(productionRuns.machineId, machines.id)).where(eq9(productionRuns.saleOrderId, saleOrderId)).groupBy(productionRuns.machineId, machines.machineName);
+  }
+  async getOperatorBreakdown(saleOrderId) {
+    return db.select({
+      operatorId: productionRuns.operatorId,
+      operatorName: operators.name,
+      totalQuantity: sql4`coalesce(sum(${productionRuns.quantityProduced}), 0)`,
+      runCount: sql4`cast(count(*) as int)`
+    }).from(productionRuns).leftJoin(operators, eq9(productionRuns.operatorId, operators.id)).where(eq9(productionRuns.saleOrderId, saleOrderId)).groupBy(productionRuns.operatorId, operators.name);
+  }
+  async findByIdempotencyKey(key) {
+    const [run] = await db.select().from(productionRuns).where(eq9(productionRuns.idempotencyKey, key)).limit(1);
+    return run;
+  }
+  /**
+   * A run with the same sale order / machine / operator / quantity created in the last
+   * `windowMs` — the fingerprint of an accidental double-submit.
+   */
+  async findRecentDuplicate(params) {
+    const since = new Date(Date.now() - (params.windowMs ?? 5e3));
+    const [run] = await db.select().from(productionRuns).where(
+      and7(
+        eq9(productionRuns.saleOrderId, params.saleOrderId),
+        params.machineId == null ? isNull(productionRuns.machineId) : eq9(productionRuns.machineId, params.machineId),
+        params.operatorId == null ? isNull(productionRuns.operatorId) : eq9(productionRuns.operatorId, params.operatorId),
+        eq9(productionRuns.quantityProduced, params.quantityProduced),
+        gte(productionRuns.createdAt, since)
+      )
+    ).limit(1);
+    return run;
+  }
+  /** Ordered quantity comes from the sale order (work_orders). */
+  async getWorkOrder(saleOrderId) {
+    const [wo] = await db.select().from(workOrders).where(eq9(workOrders.id, saleOrderId)).limit(1);
+    return wo;
+  }
+};
+var productionRunRepository = new ProductionRunRepository();
+
+// src/api/services/production-run.service.ts
+var ProductionRunService = class {
+  /**
+   * Append a production pass. Never updates a prior run — every call is one INSERT, so the
+   * full production history is preserved. Duplicate-submit protection: an identical
+   * `idempotencyKey` returns the existing run, and an identical sale-order/machine/operator/
+   * quantity fingerprint within 5 seconds is rejected as an accidental double-submit.
+   */
+  async logProductionRun(saleOrderId, data) {
+    const workOrder = await productionRunRepository.getWorkOrder(saleOrderId);
+    if (!workOrder) throw new NotFoundError(Messages.notFound(Entity.WORK_ORDER));
+    if (data.idempotencyKey) {
+      const existing = await productionRunRepository.findByIdempotencyKey(data.idempotencyKey);
+      if (existing) return existing;
+    }
+    const quantityProduced = String(data.quantityProduced);
+    const recentDuplicate = await productionRunRepository.findRecentDuplicate({
+      saleOrderId,
+      machineId: data.machineId ?? null,
+      operatorId: data.operatorId ?? null,
+      quantityProduced
+    });
+    if (recentDuplicate) {
+      throw new BadRequestError(
+        "An identical production run was just logged. If this is intentional, resubmit in a few seconds."
+      );
+    }
+    return productionRunRepository.create({
+      saleOrderId,
+      productId: data.productId,
+      machineId: data.machineId,
+      operatorId: data.operatorId,
+      quantityProduced,
+      runReason: data.runReason,
+      notes: data.notes,
+      idempotencyKey: data.idempotencyKey,
+      createdBy: data.createdBy
+    });
+  }
+  /**
+   * Production Summary for a sale order: ordered vs produced vs remaining, plus the full
+   * append-only history and per-machine / per-operator breakdowns. All derived on query.
+   */
+  async getProductionSummary(saleOrderId) {
+    const workOrder = await productionRunRepository.getWorkOrder(saleOrderId);
+    if (!workOrder) throw new NotFoundError(Messages.notFound(Entity.WORK_ORDER));
+    const [totalProduced, history, machineHistory, operatorHistory] = await Promise.all([
+      productionRunRepository.getTotalProduced(saleOrderId),
+      productionRunRepository.findBySaleOrderId(saleOrderId),
+      productionRunRepository.getMachineBreakdown(saleOrderId),
+      productionRunRepository.getOperatorBreakdown(saleOrderId)
+    ]);
+    const orderedQuantity = Number(workOrder.totalQty);
+    const remainingQuantity = orderedQuantity - totalProduced;
+    return {
+      saleOrderId,
+      soNumber: workOrder.soNumber,
+      orderedQuantity,
+      totalProduced,
+      remainingQuantity,
+      history,
+      machineHistory,
+      operatorHistory
+    };
+  }
+};
+var productionRunService = new ProductionRunService();
+
+// src/api/controllers/production-run.controller.ts
+var ProductionRunController = class {
+  logRun = asyncHandler(async (req, res) => {
+    const { saleOrderId } = req.validatedParams ?? req.params;
+    const input = req.validatedBody ?? req.body;
+    const data = await productionRunService.logProductionRun(Number(saleOrderId), input);
+    res.status(201).json({ data });
+  });
+  getSummary = asyncHandler(async (req, res) => {
+    const { saleOrderId } = req.validatedParams ?? req.params;
+    const data = await productionRunService.getProductionSummary(Number(saleOrderId));
+    res.json({ data });
+  });
+};
+var productionRunController = new ProductionRunController();
+
 // src/api/validations/work-orders.validation.ts
-import { z as z11 } from "zod";
-var wovenDetailSchema = z11.object({
-  designCode: z11.string().trim().min(1, "Design code is required"),
-  pick: z11.coerce.number().int().positive("Pick must be greater than 0"),
-  repeat: z11.coerce.number().positive("Repeat must be greater than 0"),
-  density: z11.coerce.number().int().positive("Density must be greater than 0"),
-  extra: z11.coerce.number().min(0, "Extra cannot be negative").optional()
+import { z as z12 } from "zod";
+var artworkImageSchema = z12.string().trim().max(4e6, "Image is too large \u2014 keep it under about 3 MB").refine(
+  (v) => v === "" || /^data:image\/[\w.+-]+;base64,/.test(v) || /^https?:\/\/.+/i.test(v),
+  "Artwork must be an uploaded image or a valid image URL"
+).optional();
+var wovenDetailSchema = z12.object({
+  designCode: z12.string().trim().min(1, "Design code is required"),
+  pick: z12.coerce.number().int().positive("Pick must be greater than 0"),
+  repeat: z12.coerce.number().positive("Repeat must be greater than 0"),
+  density: z12.coerce.number().int().positive("Density must be greater than 0"),
+  extra: z12.coerce.number().min(0, "Extra cannot be negative").optional(),
+  /** Size labels woven on this order, e.g. ["10", "12", "XL", "34/34"]. */
+  sizeLabels: z12.array(z12.string().trim().min(1)).optional()
 });
-var createWorkOrderSchema = z11.object({
-  body: z11.object({
-    soNumber: z11.string().min(1, "SO Number is required"),
-    poNumber: z11.string().optional(),
-    orderDate: z11.string().optional(),
-    dueDate: z11.string().optional(),
-    totalQty: z11.coerce.number().int().positive("Total quantity must be greater than 0"),
-    brandId: z11.coerce.number().int().positive("Brand ID must be a positive integer").optional(),
-    comment: z11.string().optional(),
-    /** Artwork / reference image URL, rendered on the detail page. */
-    imageUrl: z11.string().trim().url("Image must be a valid URL").max(2048).optional().or(z11.literal("")),
-    productType: z11.enum(["printed", "woven"]).default("printed"),
+var WORK_ORDER_PRIORITIES = ["normal", "urgent", "emergency"];
+var WORK_ORDER_TYPES = ["normal order", "shortfall", "additional order", "recut order"];
+var prioritySchema = z12.enum(WORK_ORDER_PRIORITIES).default("normal");
+var orderTypeSchema = z12.enum(WORK_ORDER_TYPES).default("normal order");
+var createWorkOrderSchema = z12.object({
+  body: z12.object({
+    soNumber: z12.string().min(1, "SO Number is required"),
+    poNumber: z12.string().optional(),
+    orderDate: z12.string().optional(),
+    dueDate: z12.string().optional(),
+    totalQty: z12.coerce.number().int().positive("Total quantity must be greater than 0"),
+    brandId: z12.coerce.number().int().positive("Brand ID must be a positive integer").optional(),
+    comment: z12.string().optional(),
+    priority: prioritySchema,
+    orderType: orderTypeSchema,
+    /** Artwork image — uploaded file (base64 data URI) or external URL. */
+    imageUrl: artworkImageSchema,
+    productType: z12.enum(["printed", "woven"]).default("printed"),
     /** Required when `productType` is `woven`, rejected otherwise (see refine below). */
     wovenDetail: wovenDetailSchema.optional()
   }).refine((v) => v.productType !== "woven" || v.wovenDetail !== void 0, {
@@ -3068,37 +4046,67 @@ var createWorkOrderSchema = z11.object({
     path: ["wovenDetail"]
   })
 });
-var updateWorkOrderSchema = z11.object({
-  body: z11.object({
-    poNumber: z11.string().optional(),
-    dueDate: z11.string().optional(),
-    totalQty: z11.coerce.number().int().positive().optional(),
-    brandId: z11.coerce.number().int().positive().optional(),
-    comment: z11.string().optional(),
-    imageUrl: z11.string().trim().url("Image must be a valid URL").max(2048).optional().or(z11.literal("")),
+var updateWorkOrderSchema = z12.object({
+  body: z12.object({
+    poNumber: z12.string().optional(),
+    dueDate: z12.string().optional(),
+    totalQty: z12.coerce.number().int().positive().optional(),
+    brandId: z12.coerce.number().int().positive().optional(),
+    comment: z12.string().optional(),
+    priority: prioritySchema.optional(),
+    orderType: orderTypeSchema.optional(),
+    imageUrl: artworkImageSchema,
     // `status` and `productType` are deliberately absent: status is derived from the
     // production order, and a sales order cannot change which workflow it runs through.
-    dcNumber: z11.string().optional(),
-    lcNumber: z11.string().optional(),
-    fbrInvoiceNumber: z11.string().optional(),
-    dispatchedDate: z11.string().optional(),
-    dispatchedQty: z11.coerce.number().int().positive().optional(),
+    dcNumber: z12.string().optional(),
+    lcNumber: z12.string().optional(),
+    fbrInvoiceNumber: z12.string().optional(),
+    dispatchedDate: z12.string().optional(),
+    dispatchedQty: z12.coerce.number().int().positive().optional(),
     /** Loom spec edits for a woven order (only while it is still editable). */
     wovenDetail: wovenDetailSchema.partial().optional()
   })
 });
-var dispatchWorkOrderSchema = z11.object({
-  body: z11.object({
-    dcNumber: z11.string().trim().min(1, "DC Number is required to dispatch"),
-    lcNumber: z11.string().trim().min(1, "LC Number is required to dispatch"),
-    fbrInvoiceNumber: z11.string().trim().min(1, "FBR Invoice Number is required to dispatch"),
-    dispatchedDate: z11.string().min(1, "Dispatch date is required"),
-    dispatchedQty: z11.coerce.number().int().positive("Dispatch quantity must be greater than 0")
+var dispatchWorkOrderSchema = z12.object({
+  body: z12.object({
+    dcNumber: z12.string().trim().min(1, "DC Number is required to dispatch"),
+    lcNumber: z12.string().trim().min(1, "LC Number is required to dispatch"),
+    fbrInvoiceNumber: z12.string().trim().min(1, "FBR Invoice Number is required to dispatch"),
+    dispatchedDate: z12.string().min(1, "Dispatch date is required"),
+    dispatchedQty: z12.coerce.number().int().positive("Dispatch quantity must be greater than 0"),
+    imageUrl: artworkImageSchema
   })
 });
 
+// src/api/validations/production-run.validation.ts
+import { z as z13 } from "zod";
+var RUN_REASONS = [
+  "initial",
+  "shortfall",
+  "additional_order",
+  "recut",
+  "rework",
+  "retry",
+  "other"
+];
+var createProductionRunSchema = z13.object({
+  body: z13.object({
+    productId: z13.string().trim().max(150).optional(),
+    machineId: z13.coerce.number().int().positive().optional(),
+    operatorId: z13.coerce.number().int().positive().optional(),
+    quantityProduced: z13.coerce.number().positive("Quantity produced must be greater than 0"),
+    runReason: z13.enum(RUN_REASONS).default("initial"),
+    notes: z13.string().max(1e3).optional(),
+    idempotencyKey: z13.string().max(100).optional(),
+    createdBy: z13.coerce.number().int().positive().optional()
+  })
+});
+var saleOrderParamsSchema = z13.object({
+  saleOrderId: z13.coerce.number().int().positive("A valid numeric sale order id is required")
+});
+
 // src/api/routes/work-orders.routes.ts
-var router9 = Router9();
+var router9 = Router10();
 router9.get("/", validateQuery(listWorkOrdersQuerySchema), workOrderController.getWorkOrders);
 router9.post("/", validateRequest(createWorkOrderSchema), workOrderController.createWorkOrder);
 router9.get("/:id", validateParams(idParamsSchema), workOrderController.getWorkOrder);
@@ -3110,13 +4118,24 @@ router9.post(
   workOrderController.dispatchWorkOrder
 );
 router9.delete("/:id", validateParams(idParamsSchema), workOrderController.deleteWorkOrder);
+router9.get(
+  "/:saleOrderId/production-summary",
+  validateParams(saleOrderParamsSchema),
+  productionRunController.getSummary
+);
+router9.post(
+  "/:saleOrderId/production-runs",
+  validateParams(saleOrderParamsSchema),
+  validateRequest(createProductionRunSchema),
+  productionRunController.logRun
+);
 var work_orders_routes_default = router9;
 
 // src/api/routes/production-orders.routes.ts
-import { Router as Router10 } from "express";
+import { Router as Router11 } from "express";
 
 // src/api/repositories/inventory.repository.ts
-import { eq as eq8, desc as desc3, asc as asc6, and as and7, sql as sql4 } from "drizzle-orm";
+import { eq as eq10, desc as desc5, asc as asc6, and as and8, sql as sql5 } from "drizzle-orm";
 var InventoryRepository = class {
   /**
    * Credits/debits a material's received + balance, creating the ledger row if absent.
@@ -3129,13 +4148,13 @@ var InventoryRepository = class {
    */
   async applyStockDeltaTx(tx, materialCode, deltaRolls) {
     if (deltaRolls === 0) return;
-    const [existing] = await tx.select().from(inventoryRolls).where(eq8(inventoryRolls.materialCode, materialCode)).for("update");
+    const [existing] = await tx.select().from(inventoryRolls).where(eq10(inventoryRolls.materialCode, materialCode)).for("update");
     if (existing) {
       const [updated] = await tx.update(inventoryRolls).set({
-        receivedRolls: sql4`${inventoryRolls.receivedRolls} + ${deltaRolls}`,
-        balanceRolls: sql4`${inventoryRolls.balanceRolls} + ${deltaRolls}`,
+        receivedRolls: sql5`${inventoryRolls.receivedRolls} + ${deltaRolls}`,
+        balanceRolls: sql5`${inventoryRolls.balanceRolls} + ${deltaRolls}`,
         updatedAt: /* @__PURE__ */ new Date()
-      }).where(eq8(inventoryRolls.materialCode, materialCode)).returning();
+      }).where(eq10(inventoryRolls.materialCode, materialCode)).returning();
       if (!updated || Number(updated.balanceRolls) < 0) {
         throw new BadRequestError(
           `Cannot reduce ${materialCode} stock by ${-deltaRolls} rolls: it would drive the balance negative \u2014 rolls have already been issued to production`
@@ -3165,7 +4184,7 @@ var InventoryRepository = class {
   /** Updates a purchase and reconciles inventory by the given stock deltas, atomically. */
   async updatePurchaseWithStock(id, data, adjustments) {
     return db.transaction(async (tx) => {
-      const [report] = await tx.update(purchaseRecords).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq8(purchaseRecords.id, Number(id))).returning();
+      const [report] = await tx.update(purchaseRecords).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq10(purchaseRecords.id, Number(id))).returning();
       for (const adj of adjustments) {
         await this.applyStockDeltaTx(tx, adj.materialCode, adj.rolls);
       }
@@ -3176,33 +4195,33 @@ var InventoryRepository = class {
   async deletePurchaseWithStock(id, adjustment) {
     return db.transaction(async (tx) => {
       await this.applyStockDeltaTx(tx, adjustment.materialCode, adjustment.rolls);
-      await tx.delete(purchaseRecords).where(eq8(purchaseRecords.id, Number(id)));
+      await tx.delete(purchaseRecords).where(eq10(purchaseRecords.id, Number(id)));
     });
   }
   async findPurchaseById(id) {
-    const [report] = await db.select().from(purchaseRecords).where(eq8(purchaseRecords.id, Number(id)));
+    const [report] = await db.select().from(purchaseRecords).where(eq10(purchaseRecords.id, Number(id)));
     return report;
   }
   async findAllPurchases(filters) {
     const conditions = [];
-    if (filters?.vendor) conditions.push(eq8(purchaseRecords.vendor, filters.vendor));
-    if (filters?.materialCode) conditions.push(eq8(purchaseRecords.materialCode, filters.materialCode));
+    if (filters?.vendor) conditions.push(eq10(purchaseRecords.vendor, filters.vendor));
+    if (filters?.materialCode) conditions.push(eq10(purchaseRecords.materialCode, filters.materialCode));
     if (filters?.startDate && filters?.endDate) {
-      conditions.push(sql4`${purchaseRecords.reportDate} BETWEEN ${filters.startDate} AND ${filters.endDate}`);
+      conditions.push(sql5`${purchaseRecords.reportDate} BETWEEN ${filters.startDate} AND ${filters.endDate}`);
     }
-    return db.select().from(purchaseRecords).where(conditions.length > 0 ? and7(...conditions) : void 0).orderBy(desc3(purchaseRecords.reportDate));
+    return db.select().from(purchaseRecords).where(conditions.length > 0 ? and8(...conditions) : void 0).orderBy(desc5(purchaseRecords.reportDate));
   }
   async findInventoryRolls(filters) {
     const conditions = [];
-    if (filters?.materialCode) conditions.push(eq8(inventoryRolls.materialCode, filters.materialCode));
-    return db.select().from(inventoryRolls).where(conditions.length > 0 ? and7(...conditions) : void 0).orderBy(asc6(inventoryRolls.materialCode));
+    if (filters?.materialCode) conditions.push(eq10(inventoryRolls.materialCode, filters.materialCode));
+    return db.select().from(inventoryRolls).where(conditions.length > 0 ? and8(...conditions) : void 0).orderBy(asc6(inventoryRolls.materialCode));
   }
   async findInventoryRollByMaterialCode(materialCode) {
-    const [roll] = await db.select().from(inventoryRolls).where(eq8(inventoryRolls.materialCode, materialCode));
+    const [roll] = await db.select().from(inventoryRolls).where(eq10(inventoryRolls.materialCode, materialCode));
     return roll;
   }
   async updateInventoryRoll(materialCode, data) {
-    const [roll] = await db.update(inventoryRolls).set(data).where(eq8(inventoryRolls.materialCode, materialCode)).returning();
+    const [roll] = await db.update(inventoryRolls).set(data).where(eq10(inventoryRolls.materialCode, materialCode)).returning();
     return roll;
   }
   async createInventoryRoll(data) {
@@ -3244,6 +4263,12 @@ function missingStartRequirements(line) {
   if (line.printingOperatorId == null) missing.push("printing operator");
   return missing;
 }
+function missingCuttingRequirements(line) {
+  const missing = [];
+  if (line.cuttingMachineId == null) missing.push("cutting machine");
+  if (line.cuttingOperatorId == null) missing.push("cutting operator");
+  return missing;
+}
 function cascadeChain(chain) {
   const sentToCuttingRolls = Math.min(chain.sentToCuttingRolls, chain.printedRolls);
   const cutRolls = Math.min(chain.cutRolls, sentToCuttingRolls);
@@ -3277,17 +4302,21 @@ function deriveLineStatus(line) {
   return hasAnyProgress(line) ? "active" : "pending";
 }
 function deriveOrderPatch(lines, current) {
+  if (current.status === "complete") {
+    return {
+      status: "complete",
+      plannedAt: current.plannedAt ?? /* @__PURE__ */ new Date(),
+      completedAt: current.completedAt ?? /* @__PURE__ */ new Date()
+    };
+  }
   if (lines.length === 0) return { status: "planned", plannedAt: null, completedAt: null };
   const plannedAt = current.plannedAt ?? /* @__PURE__ */ new Date();
-  const allComplete = lines.every((l) => {
-    const n = toNumbers(l);
-    return n.totalRolls > 0 && n.packagedRolls >= n.totalRolls;
-  });
-  if (allComplete) {
-    return { status: "complete", plannedAt, completedAt: current.completedAt ?? /* @__PURE__ */ new Date() };
-  }
-  const anyProgress = lines.some(hasAnyProgress);
-  return { status: anyProgress ? "production" : "planned", plannedAt, completedAt: null };
+  const anyStarted = lines.some(hasAnyProgress);
+  return {
+    status: anyStarted ? "production" : "planned",
+    plannedAt,
+    completedAt: null
+  };
 }
 
 // src/api/services/production-order-overview.builder.ts
@@ -3315,6 +4344,7 @@ function buildProductionOverviewBody(rawLines, allMachines, allOperators, allMat
       planning: {
         quantity: n.quantity,
         labelSize: n.labelSize,
+        rollLength: n.rollLength,
         requiredRolls: n.requiredRolls,
         extraRolls: n.extraRolls,
         totalRolls: n.totalRolls,
@@ -3371,14 +4401,15 @@ function buildProductionOverviewBody(rawLines, allMachines, allOperators, allMat
       liveProgress: {
         totalRolls: n.totalRolls,
         printedRolls: n.printedRolls,
-        /** Printed but not yet handed to cutting. */
+        unprintedRolls: Math.max(n.totalRolls - n.printedRolls, 0),
         waitingForCutting: Math.max(n.printedRolls - n.sentToCuttingRolls, 0),
         sentToCuttingRolls: n.sentToCuttingRolls,
         cutRolls: n.cutRolls,
-        /** Cut but not yet handed to packaging. */
+        inCuttingProcess: Math.max(n.sentToCuttingRolls - n.cutRolls, 0),
         waitingForPackaging: Math.max(n.cutRolls - n.sentToPackagingRolls, 0),
         sentToPackagingRolls: n.sentToPackagingRolls,
         packagedRolls: n.packagedRolls,
+        inPackagingProcess: Math.max(n.sentToPackagingRolls - n.packagedRolls, 0),
         completionPct: completionPct(n.packagedRolls, n.totalRolls)
       }
     };
@@ -3404,10 +4435,13 @@ function buildProductionOverviewBody(rawLines, allMachines, allOperators, allMat
     issuedRolls: sum((n) => n.issuedRolls),
     pendingIssue: sum((n) => Math.max(n.totalRolls - n.issuedRolls, 0)),
     printedRolls: sum((n) => n.printedRolls),
+    unprintedRolls: sum((n) => Math.max(n.totalRolls - n.printedRolls, 0)),
     sentToCuttingRolls: sum((n) => n.sentToCuttingRolls),
     cutRolls: sum((n) => n.cutRolls),
+    inCuttingProcess: sum((n) => Math.max(n.sentToCuttingRolls - n.cutRolls, 0)),
     sentToPackagingRolls: sum((n) => n.sentToPackagingRolls),
     packagedRolls,
+    inPackagingProcess: sum((n) => Math.max(n.sentToPackagingRolls - n.packagedRolls, 0)),
     waitingForCutting: sum((n) => Math.max(n.printedRolls - n.sentToCuttingRolls, 0)),
     waitingForPackaging: sum((n) => Math.max(n.cutRolls - n.sentToPackagingRolls, 0)),
     completionPct: completionPct(packagedRolls, totalRolls)
@@ -3536,9 +4570,22 @@ var ProductionOrderService = class {
     return `PRD-${String(next).padStart(5, "0")}`;
   }
   async updateProductionOrder(id, data) {
-    await this.getOrderOrThrow(id);
-    const updated = await productionOrderRepository.update(id, data);
+    const order = await this.getOrderOrThrow(id);
+    const patch = {};
+    if (data.notes !== void 0) patch.notes = data.notes;
+    if (data.status !== void 0) {
+      patch.status = data.status;
+      if (data.status === "complete") {
+        patch.completedAt = order.completedAt ?? /* @__PURE__ */ new Date();
+      } else {
+        patch.completedAt = null;
+      }
+    }
+    const updated = await productionOrderRepository.update(id, patch);
     if (!updated) throw new NotFoundError(Messages.notFound(Entity.PRODUCTION_ORDER));
+    if (data.status === "complete") {
+      await this.notifyIfOrderCompleted(Number(id), "complete");
+    }
     return updated;
   }
   /**
@@ -3548,10 +4595,6 @@ var ProductionOrderService = class {
    */
   async deleteProductionOrder(id) {
     await this.getOrderOrThrow(id);
-    const lines = await productionOrderRepository.findLines(id);
-    if (lines.some(hasAnyProgress)) {
-      throw new ApiError("Cannot delete a production order that has recorded production progress", 400);
-    }
     await productionOrderRepository.releaseOrderInventoryTransaction(Number(id));
   }
   /* ============ Phase 2: Per-label-type planning ============ */
@@ -3585,12 +4628,6 @@ var ProductionOrderService = class {
   async updateLinePlan(lineId, input) {
     const line = await this.getLineOrThrow(lineId);
     const order = await this.getOrderOrThrow(line.productionOrderId);
-    if (hasAnyProgress(line)) {
-      throw new ApiError(
-        `Cannot re-plan '${line.labelType}': production progress has already been recorded against it`,
-        400
-      );
-    }
     const actorUserId = await userService.assertActor(input.actorUserId);
     const siblings = (await productionOrderRepository.findLines(line.productionOrderId)).filter(
       (l) => l.id !== line.id
@@ -3622,6 +4659,10 @@ var ProductionOrderService = class {
       line.productionOrderId,
       (lines) => deriveOrderPatch(lines, order)
     );
+  }
+  async reconcileLine(lineId, data) {
+    await this.getLineOrThrow(lineId);
+    return productionOrderRepository.reconcileLineStockTransaction(Number(lineId), data);
   }
   /**
    * Validates one label type against its order and siblings, and derives the three
@@ -3660,35 +4701,36 @@ var ProductionOrderService = class {
     }
     const material = await materialRepository.findByCode(input.materialCode);
     if (!material) throw new NotFoundError(`Material with code '${input.materialCode}' not found`);
-    const assignedRolls = input.assignedRolls ?? 0;
-    if (assignedRolls < 0) {
+    const assignedRollsInput = input.assignedRolls ?? 0;
+    if (assignedRollsInput < 0) {
       throw new ApiError(`Assigned rolls for '${labelType}' cannot be negative`, 400);
     }
-    if (assignedRolls > 0) {
-      const stock = await inventoryRepository.findInventoryRollByMaterialCode(input.materialCode);
-      if (!stock) throw new NotFoundError(`No inventory record for material '${input.materialCode}'`);
-      const releasing = current && current.materialCode === input.materialCode ? Number(current.issuedRolls) : 0;
-      const available = Number(stock.balanceRolls) + releasing;
-      if (assignedRolls > available) {
-        throw new ApiError(
-          `Cannot assign ${assignedRolls} rolls of ${input.materialCode}: only ${available} available in inventory`,
-          400
-        );
-      }
+    const rollLength = input.rollLength && input.rollLength > 0 ? input.rollLength : DEFAULT_ROLL_LENGTH_M;
+    const requiredRolls = calculateRequiredRolls(input.quantity, input.labelSize, rollLength);
+    const extraRolls = input.extraRolls ?? 0;
+    const calculatedTotalRolls = calculateTotalRolls(requiredRolls, extraRolls);
+    const assignedRolls = assignedRollsInput > 0 ? assignedRollsInput : calculatedTotalRolls;
+    const totalRolls = assignedRolls;
+    const totalWeight = calculateTotalWeight(Number(material.weightPerRoll), totalRolls);
+    const stock = await inventoryRepository.findInventoryRollByMaterialCode(input.materialCode);
+    const releasing = current && current.materialCode === input.materialCode ? Number(current.issuedRolls) : 0;
+    const available = stock ? Number(stock.balanceRolls) + releasing : 0;
+    if (assignedRolls > available) {
+      throw new ApiError(
+        `Cannot assign ${assignedRolls} rolls of ${input.materialCode}: only ${available} available in inventory stock`,
+        400
+      );
     }
     const locks = await this.getResourceLocks(current ? { lineId: current.id } : void 0);
     this.assertResourcesFree(
       { printingMachineId: input.printingMachineId, printingOperatorId: input.printingOperatorId },
       locks
     );
-    const requiredRolls = calculateRequiredRolls(input.quantity, input.labelSize);
-    const extraRolls = input.extraRolls ?? 0;
-    const totalRolls = calculateTotalRolls(requiredRolls, extraRolls);
-    const totalWeight = calculateTotalWeight(Number(material.weightPerRoll), totalRolls);
     return {
       labelType,
       quantity: String(input.quantity),
       labelSize: String(input.labelSize),
+      rollLength: String(rollLength),
       requiredRolls: String(requiredRolls),
       extraRolls: String(extraRolls),
       totalRolls: String(totalRolls),
@@ -3769,7 +4811,7 @@ var ProductionOrderService = class {
         400
       );
     }
-    return productionOrderRepository.applyLineChangeTransaction(
+    const updatedLine = await productionOrderRepository.applyLineChangeTransaction(
       Number(lineId),
       // Computed against the locked row so a concurrent edit to this line can't be lost.
       (freshLine) => {
@@ -3784,6 +4826,13 @@ var ProductionOrderService = class {
           requested.printedRolls = input.completed;
         } else if (stage === "cutting") {
           previousValue = n.cutRolls;
+          const missingCut = missingCuttingRequirements(freshLine);
+          if (missingCut.length > 0) {
+            throw new ApiError(
+              `Cutting progress cannot be recorded on '${freshLine.labelType}' until a ${missingCut.join(" and ")} ${missingCut.length > 1 ? "are" : "is"} assigned`,
+              400
+            );
+          }
           if (input.completed > n.sentToCuttingRolls) {
             throw new ApiError(
               `Cut rolls (${input.completed}) cannot exceed the ${n.sentToCuttingRolls} sent to cutting`,
@@ -3837,6 +4886,8 @@ var ProductionOrderService = class {
       },
       (lines) => deriveOrderPatch(lines, order)
     );
+    await this.notifyIfOrderCompleted(line.productionOrderId, order.status);
+    return updatedLine;
   }
   /* ============ Phases 5 & 7: Manual stage transfers ============ */
   /**
@@ -3851,7 +4902,7 @@ var ProductionOrderService = class {
     if (!(input.rolls > 0)) {
       throw new ApiError("Transfer quantity must be greater than zero", 400);
     }
-    return productionOrderRepository.applyLineChangeTransaction(
+    const updatedLine = await productionOrderRepository.applyLineChangeTransaction(
       Number(lineId),
       // The delta is applied to the locked row's current total, so two concurrent transfers
       // add up instead of one overwriting the other.
@@ -3863,6 +4914,13 @@ var ProductionOrderService = class {
         if (input.target === "cutting") {
           previousValue = n.sentToCuttingRolls;
           newValue = previousValue + input.rolls;
+          const missingCut = missingCuttingRequirements(freshLine);
+          if (missingCut.length > 0) {
+            throw new ApiError(
+              `Cannot send rolls to cutting on '${freshLine.labelType}' until a ${missingCut.join(" and ")} ${missingCut.length > 1 ? "are" : "is"} assigned`,
+              400
+            );
+          }
           if (newValue > n.printedRolls) {
             const available = n.printedRolls - previousValue;
             throw new ApiError(
@@ -3900,6 +4958,8 @@ var ProductionOrderService = class {
       },
       (lines) => deriveOrderPatch(lines, order)
     );
+    await this.notifyIfOrderCompleted(line.productionOrderId, order.status);
+    return updatedLine;
   }
   /* ============ Inline row editing (Production Progress table) ============ */
   /**
@@ -3937,6 +4997,21 @@ var ProductionOrderService = class {
           `Production cannot start on '${line.labelType}' until a ${missing.join(", ")} ${missing.length > 1 ? "are" : "is"} assigned`,
           400
         );
+      }
+      const effectiveCuttingMachine = input.cuttingMachineId !== void 0 ? input.cuttingMachineId : line.cuttingMachineId;
+      const effectiveCuttingOperator = input.cuttingOperatorId !== void 0 ? input.cuttingOperatorId : line.cuttingOperatorId;
+      const isCuttingActive = input.sentToCuttingRolls !== void 0 && input.sentToCuttingRolls > 0 || input.cutRolls !== void 0 && input.cutRolls > 0 || Number(line.sentToCuttingRolls) > 0 || Number(line.cutRolls) > 0;
+      if (isCuttingActive) {
+        const missingCut = missingCuttingRequirements({
+          cuttingMachineId: effectiveCuttingMachine,
+          cuttingOperatorId: effectiveCuttingOperator
+        });
+        if (missingCut.length > 0) {
+          throw new ApiError(
+            `Cutting cannot proceed on '${line.labelType}' until a ${missingCut.join(" and ")} ${missingCut.length > 1 ? "are" : "is"} assigned`,
+            400
+          );
+        }
       }
     }
     const machineIds = [input.printingMachineId, input.cuttingMachineId].filter(
@@ -4013,15 +5088,16 @@ var ProductionOrderService = class {
       if (input.cuttingMachineId !== void 0) patch.cuttingMachineId = input.cuttingMachineId;
       if (input.cuttingOperatorId !== void 0) patch.cuttingOperatorId = input.cuttingOperatorId;
       if (input.packagingOperatorId !== void 0) patch.packagingOperatorId = input.packagingOperatorId;
+      if (input.status !== void 0) patch.status = input.status;
       return patch;
     };
     if (Object.keys(buildRowPatch(line)).length === 0) return line;
-    return productionOrderRepository.applyLineChangeTransaction(
+    const updatedLine = await productionOrderRepository.applyLineChangeTransaction(
       Number(lineId),
       (freshLine) => {
         const patch = buildRowPatch(freshLine);
         const mergedLine = { ...freshLine, ...patch };
-        patch.status = deriveLineStatus(mergedLine);
+        patch.status = input.status ?? deriveLineStatus(mergedLine);
         Object.assign(patch, stageCompletionPatch(mergedLine));
         return {
           linePatch: patch,
@@ -4034,6 +5110,8 @@ var ProductionOrderService = class {
       },
       (lines) => deriveOrderPatch(lines, order)
     );
+    await this.notifyIfOrderCompleted(line.productionOrderId, order.status);
+    return updatedLine;
   }
   /* ============ Material issuance from inventory ============ */
   /**
@@ -4149,6 +5227,27 @@ var ProductionOrderService = class {
       lines,
       totals
     };
+  }
+  async notifyIfOrderCompleted(productionOrderId, previousStatus) {
+    if (previousStatus === "complete") return;
+    try {
+      const updatedOrder = await productionOrderRepository.findById(productionOrderId);
+      if (updatedOrder && updatedOrder.status === "complete") {
+        mailService.sendProductionCompletedEmail({
+          productionNumber: updatedOrder.productionNumber,
+          soNumber: updatedOrder.soNumber,
+          poNumber: updatedOrder.poNumber,
+          companyName: updatedOrder.companyName,
+          brandName: updatedOrder.brandName,
+          totalQty: updatedOrder.totalQty,
+          completedAt: updatedOrder.completedAt
+        }).catch((err) => {
+          console.error("[ProductionOrderService] Error sending completion email:", err);
+        });
+      }
+    } catch (err) {
+      console.error("[ProductionOrderService] Failed to check completion status for email notification:", err);
+    }
   }
 };
 var productionOrderService = new ProductionOrderService();
@@ -4284,94 +5383,115 @@ var ProductionOrderController = class {
     const data = await productionOrderService.getOrderEvents(id, page);
     res.json({ data });
   });
+  reconcileLine = asyncHandler(async (req, res) => {
+    const { lineId } = req.validatedParams ?? req.params;
+    const input = req.validatedBody ?? req.body;
+    const data = await productionOrderService.reconcileLine(lineId, input);
+    res.json({ data });
+  });
 };
 var productionOrderController = new ProductionOrderController();
 
 // src/api/validations/production-orders.validation.ts
-import { z as z12 } from "zod";
-var planLineSchema = z12.object({
-  labelType: z12.string().trim().min(1, "Label type is required"),
-  quantity: z12.coerce.number().positive("Quantity must be greater than zero"),
-  labelSize: z12.coerce.number().positive("Label size must be greater than zero"),
-  extraRolls: z12.coerce.number().min(0, "Extra rolls cannot be negative").optional(),
+import { z as z14 } from "zod";
+var planLineSchema = z14.object({
+  labelType: z14.string().trim().min(1, "Label type is required"),
+  quantity: z14.coerce.number().positive("Quantity must be greater than zero"),
+  labelSize: z14.coerce.number().positive("Label size must be greater than zero"),
+  rollLength: z14.coerce.number().positive("Roll length must be greater than zero").optional(),
+  extraRolls: z14.coerce.number().min(0, "Extra rolls cannot be negative").optional(),
   /* Reserved on submit, so all three are required — see production-order.service.ts. */
-  materialCode: z12.string().trim().min(1, "Material is required"),
+  materialCode: z14.string().trim().min(1, "Material is required"),
   /** Manual figure — the rolls drawn from inventory for this label type on save. */
-  assignedRolls: z12.coerce.number().min(0, "Assigned rolls cannot be negative").optional(),
-  printingMachineId: z12.coerce.number().int().positive("Printing machine is required"),
-  printingOperatorId: z12.coerce.number().int().positive("Printing operator is required"),
-  notes: z12.string().optional()
+  assignedRolls: z14.coerce.number().min(0, "Assigned rolls cannot be negative").optional(),
+  printingMachineId: z14.coerce.number().int().positive("Printing machine is required"),
+  printingOperatorId: z14.coerce.number().int().positive("Printing operator is required"),
+  notes: z14.string().optional()
 });
-var createProductionOrderSchema = z12.object({
-  body: z12.object({
-    workOrderId: z12.coerce.number().int().positive("A sales order is required"),
-    notes: z12.string().optional(),
-    createdByUserId: z12.coerce.number().int().positive().optional()
+var createProductionOrderSchema = z14.object({
+  body: z14.object({
+    workOrderId: z14.coerce.number().int().positive("A sales order is required"),
+    notes: z14.string().optional(),
+    createdByUserId: z14.coerce.number().int().positive().optional()
   })
 });
-var updateProductionOrderSchema = z12.object({
-  body: z12.object({
-    notes: z12.string().optional()
+var updateProductionOrderSchema = z14.object({
+  body: z14.object({
+    notes: z14.string().optional(),
+    status: z14.enum(["planned", "production", "complete"]).optional()
   })
 });
-var planLineRequestSchema = z12.object({
+var planLineRequestSchema = z14.object({
   body: planLineSchema.extend({
-    actorUserId: z12.coerce.number().int().positive().optional()
+    actorUserId: z14.coerce.number().int().positive().optional()
   })
 });
-var assignLineResourcesSchema = z12.object({
-  body: z12.object({
-    stage: z12.enum(["printing", "cutting", "packaging"]),
-    machineId: z12.coerce.number().int().positive().nullable().optional(),
-    operatorId: z12.coerce.number().int().positive().nullable().optional(),
-    actorUserId: z12.coerce.number().int().positive().optional()
+var assignLineResourcesSchema = z14.object({
+  body: z14.object({
+    stage: z14.enum(["printing", "cutting", "packaging"]),
+    machineId: z14.coerce.number().int().positive().nullable().optional(),
+    operatorId: z14.coerce.number().int().positive().nullable().optional(),
+    actorUserId: z14.coerce.number().int().positive().optional()
   })
 });
-var updateStageProgressSchema = z12.object({
-  body: z12.object({
-    completed: z12.coerce.number().min(0, "Completed rolls cannot be negative"),
-    packagedQty: z12.coerce.number().min(0, "Packaged quantity cannot be negative").optional(),
-    note: z12.string().optional(),
-    actorUserId: z12.coerce.number().int().positive().optional()
+var updateStageProgressSchema = z14.object({
+  body: z14.object({
+    completed: z14.coerce.number().min(0, "Completed rolls cannot be negative"),
+    packagedQty: z14.coerce.number().min(0, "Packaged quantity cannot be negative").optional(),
+    note: z14.string().optional(),
+    actorUserId: z14.coerce.number().int().positive().optional()
   })
 });
-var transferRollsSchema = z12.object({
-  body: z12.object({
-    target: z12.enum(["cutting", "packaging"]),
-    rolls: z12.coerce.number().positive("Transfer quantity must be greater than zero"),
-    note: z12.string().optional(),
-    actorUserId: z12.coerce.number().int().positive().optional()
+var transferRollsSchema = z14.object({
+  body: z14.object({
+    target: z14.enum(["cutting", "packaging"]),
+    rolls: z14.coerce.number().positive("Transfer quantity must be greater than zero"),
+    note: z14.string().optional(),
+    actorUserId: z14.coerce.number().int().positive().optional()
   })
 });
-var issueRollsSchema = z12.object({
-  body: z12.object({
-    materialCode: z12.string().trim().min(1).optional(),
-    rolls: z12.coerce.number().positive("Issued rolls must be greater than zero"),
-    note: z12.string().optional(),
-    actorUserId: z12.coerce.number().int().positive().optional()
+var issueRollsSchema = z14.object({
+  body: z14.object({
+    materialCode: z14.string().trim().min(1).optional(),
+    rolls: z14.coerce.number().positive("Issued rolls must be greater than zero"),
+    note: z14.string().optional(),
+    actorUserId: z14.coerce.number().int().positive().optional()
   })
 });
-var updateLineFullSchema = z12.object({
-  body: z12.object({
-    printedRolls: z12.coerce.number().min(0, "Cannot be negative").optional(),
-    sentToCuttingRolls: z12.coerce.number().min(0, "Cannot be negative").optional(),
-    cutRolls: z12.coerce.number().min(0, "Cannot be negative").optional(),
-    sentToPackagingRolls: z12.coerce.number().min(0, "Cannot be negative").optional(),
-    packagedRolls: z12.coerce.number().min(0, "Cannot be negative").optional(),
-    packagedQty: z12.coerce.number().min(0, "Cannot be negative").optional(),
-    materialCode: z12.string().trim().min(1).optional(),
-    printingMachineId: z12.coerce.number().int().positive().nullable().optional(),
-    printingOperatorId: z12.coerce.number().int().positive().nullable().optional(),
-    cuttingMachineId: z12.coerce.number().int().positive().nullable().optional(),
-    cuttingOperatorId: z12.coerce.number().int().positive().nullable().optional(),
-    packagingOperatorId: z12.coerce.number().int().positive().nullable().optional(),
-    note: z12.string().optional(),
-    actorUserId: z12.coerce.number().int().positive().optional()
+var updateLineFullSchema = z14.object({
+  body: z14.object({
+    printedRolls: z14.coerce.number().min(0, "Cannot be negative").optional(),
+    sentToCuttingRolls: z14.coerce.number().min(0, "Cannot be negative").optional(),
+    cutRolls: z14.coerce.number().min(0, "Cannot be negative").optional(),
+    sentToPackagingRolls: z14.coerce.number().min(0, "Cannot be negative").optional(),
+    packagedRolls: z14.coerce.number().min(0, "Cannot be negative").optional(),
+    packagedQty: z14.coerce.number().min(0, "Cannot be negative").optional(),
+    materialCode: z14.string().trim().min(1).optional(),
+    printingMachineId: z14.coerce.number().int().positive().nullable().optional(),
+    printingOperatorId: z14.coerce.number().int().positive().nullable().optional(),
+    cuttingMachineId: z14.coerce.number().int().positive().nullable().optional(),
+    cuttingOperatorId: z14.coerce.number().int().positive().nullable().optional(),
+    packagingOperatorId: z14.coerce.number().int().positive().nullable().optional(),
+    usedRolls: z14.coerce.number().min(0, "Cannot be negative").optional(),
+    usedWeight: z14.coerce.number().min(0, "Cannot be negative").optional(),
+    extraRollsReturned: z14.coerce.number().min(0, "Cannot be negative").optional(),
+    extraWeight: z14.coerce.number().min(0, "Cannot be negative").optional(),
+    note: z14.string().optional(),
+    actorUserId: z14.coerce.number().int().positive().optional()
+  })
+});
+var reconcileLineSchema = z14.object({
+  body: z14.object({
+    usedRolls: z14.coerce.number().min(0, "Used rolls cannot be negative"),
+    usedWeight: z14.coerce.number().min(0, "Used weight cannot be negative"),
+    extraRollsReturned: z14.coerce.number().min(0, "Extra rolls returned cannot be negative"),
+    extraWeight: z14.coerce.number().min(0, "Extra weight cannot be negative"),
+    actorUserId: z14.coerce.number().int().positive().optional()
   })
 });
 
 // src/api/routes/production-orders.routes.ts
-var router10 = Router10();
+var router10 = Router11();
 router10.get("/", validateQuery(listProductionOrdersQuerySchema), productionOrderController.getProductionOrders);
 router10.get("/eligible-sales-orders", productionOrderController.getEligibleSalesOrders);
 router10.get("/available-resources", productionOrderController.getAvailableResources);
@@ -4389,6 +5509,12 @@ router10.patch(
   validateParams(lineIdParamsSchema),
   validateRequest(updateLineFullSchema),
   productionOrderController.updateLineFull
+);
+router10.put(
+  "/lines/:lineId/reconcile",
+  validateParams(lineIdParamsSchema),
+  validateRequest(reconcileLineSchema),
+  productionOrderController.reconcileLine
 );
 router10.patch(
   "/lines/:lineId/assign",
@@ -4421,36 +5547,36 @@ router10.get("/lines/:lineId/events", validateParams(lineIdParamsSchema), valida
 var production_orders_routes_default = router10;
 
 // src/api/routes/woven-production.routes.ts
-import { Router as Router11 } from "express";
+import { Router as Router12 } from "express";
 
 // src/api/repositories/woven-production.repository.ts
-import { eq as eq10, and as and9, sql as sql6 } from "drizzle-orm";
+import { eq as eq12, and as and10, sql as sql7 } from "drizzle-orm";
 
 // src/api/repositories/thread-inventory.repository.ts
-import { eq as eq9, desc as desc4, and as and8, sql as sql5, isNull, inArray as inArray4 } from "drizzle-orm";
+import { eq as eq11, desc as desc6, and as and9, sql as sql6, isNull as isNull2, inArray as inArray4 } from "drizzle-orm";
 var ThreadInventoryRepository = class {
   /* ============================ Reads ============================ */
   async findStocks(filters) {
     const conditions = [];
-    if (filters?.stockType) conditions.push(eq9(threadStocks.stockType, filters.stockType));
-    if (filters?.denier) conditions.push(eq9(threadStocks.denier, filters.denier));
+    if (filters?.stockType) conditions.push(eq11(threadStocks.stockType, filters.stockType));
+    if (filters?.denier) conditions.push(eq11(threadStocks.denier, filters.denier));
     if (filters?.colorName) {
-      conditions.push(sql5`${threadStocks.colorName} ILIKE ${"%" + filters.colorName + "%"}`);
+      conditions.push(sql6`${threadStocks.colorName} ILIKE ${"%" + filters.colorName + "%"}`);
     }
-    return db.select().from(threadStocks).where(conditions.length ? and8(...conditions) : void 0).orderBy(threadStocks.stockType, threadStocks.denier, threadStocks.colorName);
+    return db.select().from(threadStocks).where(conditions.length ? and9(...conditions) : void 0).orderBy(threadStocks.stockType, threadStocks.denier, threadStocks.colorName);
   }
   async findStockById(id) {
-    const [row] = await db.select().from(threadStocks).where(eq9(threadStocks.id, id));
+    const [row] = await db.select().from(threadStocks).where(eq11(threadStocks.id, id));
     return row;
   }
   async countStocks(filters) {
     const conditions = [];
-    if (filters?.stockType) conditions.push(eq9(threadStocks.stockType, filters.stockType));
-    if (filters?.denier) conditions.push(eq9(threadStocks.denier, filters.denier));
+    if (filters?.stockType) conditions.push(eq11(threadStocks.stockType, filters.stockType));
+    if (filters?.denier) conditions.push(eq11(threadStocks.denier, filters.denier));
     if (filters?.colorName) {
-      conditions.push(sql5`${threadStocks.colorName} ILIKE ${"%" + filters.colorName + "%"}`);
+      conditions.push(sql6`${threadStocks.colorName} ILIKE ${"%" + filters.colorName + "%"}`);
     }
-    const [row] = await db.select({ count: sql5`count(*)` }).from(threadStocks).where(conditions.length ? and8(...conditions) : void 0);
+    const [row] = await db.select({ count: sql6`count(*)` }).from(threadStocks).where(conditions.length ? and9(...conditions) : void 0);
     return Number(row?.count ?? 0);
   }
   /** Creates a thread ledger with its opening balance recorded as the first movement. */
@@ -4463,7 +5589,7 @@ var ThreadInventoryRepository = class {
           actorUserId
         });
       }
-      const [fresh] = await tx.select().from(threadStocks).where(eq9(threadStocks.id, stock.id));
+      const [fresh] = await tx.select().from(threadStocks).where(eq11(threadStocks.id, stock.id));
       return fresh;
     });
   }
@@ -4474,13 +5600,13 @@ var ThreadInventoryRepository = class {
    */
   async updateStockWithHistory(id, patch, note, actorUserId) {
     return db.transaction(async (tx) => {
-      const [locked] = await tx.select().from(threadStocks).where(eq9(threadStocks.id, id)).for("update");
+      const [locked] = await tx.select().from(threadStocks).where(eq11(threadStocks.id, id)).for("update");
       if (!locked) throw new NotFoundError("Thread stock not found");
       const attrs = {};
       if (patch.colorName !== void 0) attrs.colorName = patch.colorName;
       if (patch.colorCode !== void 0) attrs.colorCode = patch.colorCode;
       if (Object.keys(attrs).length > 0) {
-        await tx.update(threadStocks).set({ ...attrs, updatedAt: /* @__PURE__ */ new Date() }).where(eq9(threadStocks.id, id));
+        await tx.update(threadStocks).set({ ...attrs, updatedAt: /* @__PURE__ */ new Date() }).where(eq11(threadStocks.id, id));
       }
       if (patch.balanceKg !== void 0) {
         if (patch.balanceKg < 0) throw new BadRequestError("Balance cannot be negative");
@@ -4492,7 +5618,7 @@ var ThreadInventoryRepository = class {
           });
         }
       }
-      const [fresh] = await tx.select().from(threadStocks).where(eq9(threadStocks.id, id));
+      const [fresh] = await tx.select().from(threadStocks).where(eq11(threadStocks.id, id));
       return fresh;
     });
   }
@@ -4504,35 +5630,35 @@ var ThreadInventoryRepository = class {
    * only a real production draw or dye run is, because those leave records pointing here.
    */
   async findConsumedByProcessKg(id) {
-    const [row] = await db.select({ total: sql5`coalesce(sum(${threadStockMovements.weightKg}), 0)` }).from(threadStockMovements).where(
-      and8(
-        eq9(threadStockMovements.threadStockId, id),
+    const [row] = await db.select({ total: sql6`coalesce(sum(${threadStockMovements.weightKg}), 0)` }).from(threadStockMovements).where(
+      and9(
+        eq11(threadStockMovements.threadStockId, id),
         inArray4(threadStockMovements.movementType, ["production_issue", "dye_consume"])
       )
     );
     return Math.abs(Number(row?.total ?? 0));
   }
   async deleteStock(id) {
-    await db.delete(threadStocks).where(eq9(threadStocks.id, id));
+    await db.delete(threadStocks).where(eq11(threadStocks.id, id));
   }
   async findMovements(threadStockId, limit = 200) {
-    return db.select().from(threadStockMovements).where(threadStockId ? eq9(threadStockMovements.threadStockId, threadStockId) : void 0).orderBy(desc4(threadStockMovements.createdAt)).limit(limit);
+    return db.select().from(threadStockMovements).where(threadStockId ? eq11(threadStockMovements.threadStockId, threadStockId) : void 0).orderBy(desc6(threadStockMovements.createdAt)).limit(limit);
   }
   async findPurchases(filters) {
     const conditions = [];
-    if (filters?.vendor) conditions.push(sql5`${threadPurchases.vendor} ILIKE ${"%" + filters.vendor + "%"}`);
-    if (filters?.denier) conditions.push(eq9(threadPurchases.denier, filters.denier));
-    return db.select().from(threadPurchases).where(conditions.length ? and8(...conditions) : void 0).orderBy(desc4(threadPurchases.receivedDate));
+    if (filters?.vendor) conditions.push(sql6`${threadPurchases.vendor} ILIKE ${"%" + filters.vendor + "%"}`);
+    if (filters?.denier) conditions.push(eq11(threadPurchases.denier, filters.denier));
+    return db.select().from(threadPurchases).where(conditions.length ? and9(...conditions) : void 0).orderBy(desc6(threadPurchases.receivedDate));
   }
   async findPurchaseById(id) {
-    const [row] = await db.select().from(threadPurchases).where(eq9(threadPurchases.id, id));
+    const [row] = await db.select().from(threadPurchases).where(eq11(threadPurchases.id, id));
     return row;
   }
   async findDyeBatches(limit = 200) {
-    return db.select().from(threadDyeBatches).orderBy(desc4(threadDyeBatches.createdAt)).limit(limit);
+    return db.select().from(threadDyeBatches).orderBy(desc6(threadDyeBatches.createdAt)).limit(limit);
   }
   async findLastBatchNumber() {
-    const [row] = await db.select({ batchNumber: threadDyeBatches.batchNumber }).from(threadDyeBatches).orderBy(desc4(threadDyeBatches.id)).limit(1);
+    const [row] = await db.select({ batchNumber: threadDyeBatches.batchNumber }).from(threadDyeBatches).orderBy(desc6(threadDyeBatches.id)).limit(1);
     return row?.batchNumber;
   }
   /* ==================== Core stock primitives ==================== */
@@ -4541,11 +5667,11 @@ var ThreadInventoryRepository = class {
    * way out so the caller can safely compute against the balance it just read.
    */
   async getOrCreateStockTx(tx, identity) {
-    const match = and8(
-      eq9(threadStocks.stockType, identity.stockType),
-      eq9(threadStocks.denier, identity.denier),
-      eq9(threadStocks.colorName, identity.colorName),
-      identity.colorCode === null ? isNull(threadStocks.colorCode) : eq9(threadStocks.colorCode, identity.colorCode)
+    const match = and9(
+      eq11(threadStocks.stockType, identity.stockType),
+      eq11(threadStocks.denier, identity.denier),
+      eq11(threadStocks.colorName, identity.colorName),
+      identity.colorCode === null ? isNull2(threadStocks.colorCode) : eq11(threadStocks.colorCode, identity.colorCode)
     );
     const [existing] = await tx.select().from(threadStocks).where(match).for("update");
     if (existing) return existing;
@@ -4558,7 +5684,7 @@ var ThreadInventoryRepository = class {
    * cannot go below zero, and silently allowing it would corrupt every downstream figure.
    */
   async moveStockTx(tx, stockId, weightKg, movementType, ref) {
-    const [locked] = await tx.select().from(threadStocks).where(eq9(threadStocks.id, stockId)).for("update");
+    const [locked] = await tx.select().from(threadStocks).where(eq11(threadStocks.id, stockId)).for("update");
     if (!locked) throw new NotFoundError("Thread stock row not found");
     const nextBalance = Number(locked.balanceKg) + weightKg;
     if (nextBalance < -5e-4) {
@@ -4571,7 +5697,7 @@ var ThreadInventoryRepository = class {
       receivedKg: weightKg > 0 ? String(Number(locked.receivedKg) + weightKg) : locked.receivedKg,
       consumedKg: weightKg < 0 ? String(Number(locked.consumedKg) - weightKg) : locked.consumedKg,
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq9(threadStocks.id, stockId));
+    }).where(eq11(threadStocks.id, stockId));
     await tx.insert(threadStockMovements).values({
       threadStockId: stockId,
       movementType,
@@ -4619,7 +5745,7 @@ var ThreadInventoryRepository = class {
         note: "Purchase record deleted",
         actorUserId
       });
-      await tx.delete(threadPurchases).where(eq9(threadPurchases.id, id));
+      await tx.delete(threadPurchases).where(eq11(threadPurchases.id, id));
     });
   }
   /* ========================== Dyeing ========================== */
@@ -4673,11 +5799,11 @@ var ThreadInventoryRepository = class {
     let remaining = want.weightKg;
     if (!(remaining > 0)) return slices;
     const [secondary] = await tx.select().from(threadStocks).where(
-      and8(
-        eq9(threadStocks.stockType, "secondary"),
-        eq9(threadStocks.denier, want.denier),
-        eq9(threadStocks.colorName, want.colorName),
-        eq9(threadStocks.colorCode, want.colorCode)
+      and9(
+        eq11(threadStocks.stockType, "secondary"),
+        eq11(threadStocks.denier, want.denier),
+        eq11(threadStocks.colorName, want.colorName),
+        eq11(threadStocks.colorCode, want.colorCode)
       )
     ).for("update");
     if (secondary) {
@@ -4699,9 +5825,9 @@ var ThreadInventoryRepository = class {
     }
     if (remaining <= 5e-4) return slices;
     const primaries = await tx.select().from(threadStocks).where(
-      and8(
-        eq9(threadStocks.stockType, "primary"),
-        eq9(threadStocks.denier, want.denier),
+      and9(
+        eq11(threadStocks.stockType, "primary"),
+        eq11(threadStocks.denier, want.denier),
         inArray4(threadStocks.colorName, ["White", "Black"])
       )
     ).for("update");
@@ -4736,12 +5862,12 @@ var ThreadInventoryRepository = class {
   async releaseForPlanTx(tx, referenceType, referenceId, actorUserId) {
     const issued = await tx.select({
       threadStockId: threadStockMovements.threadStockId,
-      total: sql5`sum(${threadStockMovements.weightKg})`
+      total: sql6`sum(${threadStockMovements.weightKg})`
     }).from(threadStockMovements).where(
-      and8(
-        eq9(threadStockMovements.referenceType, referenceType),
-        eq9(threadStockMovements.referenceId, referenceId),
-        eq9(threadStockMovements.movementType, "production_issue")
+      and9(
+        eq11(threadStockMovements.referenceType, referenceType),
+        eq11(threadStockMovements.referenceId, referenceId),
+        eq11(threadStockMovements.movementType, "production_issue")
       )
     ).groupBy(threadStockMovements.threadStockId);
     for (const row of issued) {
@@ -4762,14 +5888,14 @@ var threadInventoryRepository = new ThreadInventoryRepository();
 var PLAN_REF = "woven_production_line";
 var WovenProductionRepository = class {
   async findLines(productionOrderId) {
-    return db.select().from(wovenProductionLines).where(eq10(wovenProductionLines.productionOrderId, Number(productionOrderId))).orderBy(wovenProductionLines.id);
+    return db.select().from(wovenProductionLines).where(eq12(wovenProductionLines.productionOrderId, Number(productionOrderId))).orderBy(wovenProductionLines.id);
   }
   async findLineById(lineId) {
-    const [row] = await db.select().from(wovenProductionLines).where(eq10(wovenProductionLines.id, Number(lineId)));
+    const [row] = await db.select().from(wovenProductionLines).where(eq12(wovenProductionLines.id, Number(lineId)));
     return row;
   }
   async findThreadPlan(lineId) {
-    return db.select().from(wovenThreadPlanItems).where(eq10(wovenThreadPlanItems.wovenProductionLineId, Number(lineId))).orderBy(wovenThreadPlanItems.sortOrder);
+    return db.select().from(wovenThreadPlanItems).where(eq12(wovenThreadPlanItems.wovenProductionLineId, Number(lineId))).orderBy(wovenThreadPlanItems.sortOrder);
   }
   /** The woven order header, joined through to its sales order and loom spec. */
   async findOrderContext(productionOrderId) {
@@ -4781,7 +5907,7 @@ var WovenProductionRepository = class {
       workOrderId: workOrders.id,
       soNumber: workOrders.soNumber,
       productType: workOrders.productType
-    }).from(productionOrders).innerJoin(workOrders, eq10(productionOrders.workOrderId, workOrders.id)).where(eq10(productionOrders.id, Number(productionOrderId)));
+    }).from(productionOrders).innerJoin(workOrders, eq12(productionOrders.workOrderId, workOrders.id)).where(eq12(productionOrders.id, Number(productionOrderId)));
     return row;
   }
   /** Machine/operator names for the overview, resolved in one round trip. */
@@ -4801,11 +5927,11 @@ var WovenProductionRepository = class {
     return db.transaction(async (tx) => {
       let target;
       if (lineId) {
-        const [locked] = await tx.select().from(wovenProductionLines).where(eq10(wovenProductionLines.id, lineId)).for("update");
+        const [locked] = await tx.select().from(wovenProductionLines).where(eq12(wovenProductionLines.id, lineId)).for("update");
         if (!locked) throw new NotFoundError("Woven production line not found");
         await threadInventoryRepository.releaseForPlanTx(tx, PLAN_REF, lineId, actorUserId);
-        await tx.delete(wovenThreadPlanItems).where(eq10(wovenThreadPlanItems.wovenProductionLineId, lineId));
-        const [updated] = await tx.update(wovenProductionLines).set({ ...line, updatedAt: /* @__PURE__ */ new Date() }).where(eq10(wovenProductionLines.id, lineId)).returning();
+        await tx.delete(wovenThreadPlanItems).where(eq12(wovenThreadPlanItems.wovenProductionLineId, lineId));
+        const [updated] = await tx.update(wovenProductionLines).set({ ...line, updatedAt: /* @__PURE__ */ new Date() }).where(eq12(wovenProductionLines.id, lineId)).returning();
         target = updated;
       } else {
         const [created] = await tx.insert(wovenProductionLines).values({ ...line, productionOrderId }).returning();
@@ -4839,7 +5965,7 @@ var WovenProductionRepository = class {
         totalThreadWeightKg: String(totalWeight),
         planningCompletedAt: /* @__PURE__ */ new Date(),
         updatedAt: /* @__PURE__ */ new Date()
-      }).where(eq10(wovenProductionLines.id, target.id)).returning();
+      }).where(eq12(wovenProductionLines.id, target.id)).returning();
       await this.resyncOrderTx(tx, productionOrderId, derive);
       return finalLine;
     });
@@ -4848,7 +5974,7 @@ var WovenProductionRepository = class {
   async deleteLineTransaction(lineId, productionOrderId, derive, actorUserId) {
     return db.transaction(async (tx) => {
       await threadInventoryRepository.releaseForPlanTx(tx, PLAN_REF, lineId, actorUserId);
-      await tx.delete(wovenProductionLines).where(eq10(wovenProductionLines.id, lineId));
+      await tx.delete(wovenProductionLines).where(eq12(wovenProductionLines.id, lineId));
       await this.resyncOrderTx(tx, productionOrderId, derive);
     });
   }
@@ -4859,10 +5985,10 @@ var WovenProductionRepository = class {
    */
   async applyStageChangeTransaction(lineId, compute, derive) {
     return db.transaction(async (tx) => {
-      const [locked] = await tx.select().from(wovenProductionLines).where(eq10(wovenProductionLines.id, lineId)).for("update");
+      const [locked] = await tx.select().from(wovenProductionLines).where(eq12(wovenProductionLines.id, lineId)).for("update");
       if (!locked) throw new NotFoundError("Woven production line not found");
       const patch = compute(locked);
-      const [line] = await tx.update(wovenProductionLines).set({ ...patch, updatedAt: /* @__PURE__ */ new Date() }).where(eq10(wovenProductionLines.id, lineId)).returning();
+      const [line] = await tx.update(wovenProductionLines).set({ ...patch, updatedAt: /* @__PURE__ */ new Date() }).where(eq12(wovenProductionLines.id, lineId)).returning();
       await this.resyncOrderTx(tx, line.productionOrderId, derive);
       return line;
     });
@@ -4873,9 +5999,9 @@ var WovenProductionRepository = class {
    */
   async reconcileRemainingThreadsTransaction(lineId, threads, actorUserId) {
     return db.transaction(async (tx) => {
-      const [line] = await tx.select().from(wovenProductionLines).where(eq10(wovenProductionLines.id, lineId)).for("update");
+      const [line] = await tx.select().from(wovenProductionLines).where(eq12(wovenProductionLines.id, lineId)).for("update");
       if (!line) throw new NotFoundError("Woven production line not found");
-      const existingThreads = await tx.select().from(wovenThreadPlanItems).where(eq10(wovenThreadPlanItems.wovenProductionLineId, lineId));
+      const existingThreads = await tx.select().from(wovenThreadPlanItems).where(eq12(wovenThreadPlanItems.wovenProductionLineId, lineId));
       for (const inputThread of threads) {
         const target = existingThreads.find((t) => t.id === inputThread.id);
         if (!target) continue;
@@ -4907,23 +6033,23 @@ var WovenProductionRepository = class {
           remainingWeightKg: String(remWeight),
           actualConsumedWeightKg: String(actualConsumed),
           updatedAt: /* @__PURE__ */ new Date()
-        }).where(eq10(wovenThreadPlanItems.id, target.id));
+        }).where(eq12(wovenThreadPlanItems.id, target.id));
       }
-      return tx.select().from(wovenThreadPlanItems).where(eq10(wovenThreadPlanItems.wovenProductionLineId, lineId)).orderBy(wovenThreadPlanItems.sortOrder);
+      return tx.select().from(wovenThreadPlanItems).where(eq12(wovenThreadPlanItems.wovenProductionLineId, lineId)).orderBy(wovenThreadPlanItems.sortOrder);
     });
   }
   /** Re-derives the parent order's status from its woven lines, inside the caller's tx. */
   async resyncOrderTx(tx, productionOrderId, derive) {
-    const siblings = await tx.select().from(wovenProductionLines).where(eq10(wovenProductionLines.productionOrderId, productionOrderId));
+    const siblings = await tx.select().from(wovenProductionLines).where(eq12(wovenProductionLines.productionOrderId, productionOrderId));
     const patch = derive(siblings);
-    await tx.update(productionOrders).set({ ...patch, updatedAt: /* @__PURE__ */ new Date() }).where(eq10(productionOrders.id, productionOrderId));
+    await tx.update(productionOrders).set({ ...patch, updatedAt: /* @__PURE__ */ new Date() }).where(eq12(productionOrders.id, productionOrderId));
     if (patch.status) {
-      const [order] = await tx.select({ workOrderId: productionOrders.workOrderId }).from(productionOrders).where(eq10(productionOrders.id, productionOrderId));
+      const [order] = await tx.select({ workOrderId: productionOrders.workOrderId }).from(productionOrders).where(eq12(productionOrders.id, productionOrderId));
       if (order) {
         await tx.update(workOrders).set({
           status: patch.status === "complete" ? "complete" : "production",
           updatedAt: /* @__PURE__ */ new Date()
-        }).where(and9(eq10(workOrders.id, order.workOrderId), sql6`${workOrders.status} <> 'dispatched'`));
+        }).where(and10(eq12(workOrders.id, order.workOrderId), sql7`${workOrders.status} <> 'dispatched'`));
       }
     }
   }
@@ -5065,17 +6191,27 @@ var WovenProductionService = class {
       })
     );
     const sum = (pick) => lines.reduce((acc, l) => acc + pick(l), 0);
+    const totalThreadIssued = sum((l) => Number(l.totalThreadWeightKg));
+    const remainingThreadReturned = detailed.reduce(
+      (acc, line) => acc + line.planning.threads.reduce((tAcc, t) => tAcc + (t.remainingWeightKg || 0), 0),
+      0
+    );
+    const threadUsedInPackagedQuantity = sum((l) => Number(l.packagedWeightKg));
+    const beamTotal = Math.max(0, totalThreadIssued - remainingThreadReturned - threadUsedInPackagedQuantity);
     return {
       productionOrder: ctx,
       lines: detailed,
       totals: {
         lineCount: lines.length,
         quantity: sum((l) => Number(l.quantity)),
-        totalThreadWeightKg: sum((l) => Number(l.totalThreadWeightKg)),
+        totalThreadWeightKg: totalThreadIssued,
+        remainingThreadReturned,
+        threadUsedInPackagedQuantity,
+        beamTotal,
         wovenQty: sum((l) => Number(l.wovenQty)),
         cutQty: sum((l) => Number(l.cutQty)),
         packagedQty: sum((l) => Number(l.packagedQty)),
-        packagedWeightKg: sum((l) => Number(l.packagedWeightKg))
+        packagedWeightKg: threadUsedInPackagedQuantity
       }
     };
   }
@@ -5117,14 +6253,7 @@ var WovenProductionService = class {
     const operator = await operatorRepository.findById(input.weavingOperatorId);
     if (!operator) throw new NotFoundError(Messages.notFound(Entity.OPERATOR));
     if (lineId) {
-      const existing = await this.getLineOrThrow(lineId);
-      const n = toNumbers2(existing);
-      if (n.wovenQty > 0 || n.cutQty > 0 || n.packagedQty > 0) {
-        throw new ApiError(
-          "Cannot re-plan this line: production progress has already been recorded against it",
-          400
-        );
-      }
+      await this.getLineOrThrow(lineId);
     }
     return wovenProductionRepository.savePlanTransaction(
       Number(productionOrderId),
@@ -5161,7 +6290,7 @@ var WovenProductionService = class {
     const line = await this.getLineOrThrow(lineId);
     const order = await this.getOrderOrThrow(line.productionOrderId);
     await userService.assertActor(input.actorUserId);
-    return wovenProductionRepository.applyStageChangeTransaction(
+    const res = await wovenProductionRepository.applyStageChangeTransaction(
       Number(lineId),
       (fresh) => {
         const n = toNumbers2(fresh);
@@ -5187,6 +6316,8 @@ var WovenProductionService = class {
       },
       (lines) => deriveWovenOrderPatch(lines, order)
     );
+    await this.notifyIfOrderCompleted(line.productionOrderId, order.status);
+    return res;
   }
   /** Records cutting. Blocked until weaving is 100% complete. */
   async updateCutting(lineId, input) {
@@ -5196,7 +6327,7 @@ var WovenProductionService = class {
     if (input.cuttingOperatorId != null && !await operatorRepository.findById(input.cuttingOperatorId)) {
       throw new NotFoundError(Messages.notFound(Entity.OPERATOR));
     }
-    return wovenProductionRepository.applyStageChangeTransaction(
+    const res = await wovenProductionRepository.applyStageChangeTransaction(
       Number(lineId),
       (fresh) => {
         const n = toNumbers2(fresh);
@@ -5224,6 +6355,8 @@ var WovenProductionService = class {
       },
       (lines) => deriveWovenOrderPatch(lines, order)
     );
+    await this.notifyIfOrderCompleted(line.productionOrderId, order.status);
+    return res;
   }
   /** Records packaging. Blocked until cut quantity equals woven quantity. */
   async updatePackaging(lineId, input) {
@@ -5233,7 +6366,7 @@ var WovenProductionService = class {
     if (input.packagingOperatorId != null && !await operatorRepository.findById(input.packagingOperatorId)) {
       throw new NotFoundError(Messages.notFound(Entity.OPERATOR));
     }
-    return wovenProductionRepository.applyStageChangeTransaction(
+    const res = await wovenProductionRepository.applyStageChangeTransaction(
       Number(lineId),
       (fresh) => {
         const n = toNumbers2(fresh);
@@ -5265,6 +6398,8 @@ var WovenProductionService = class {
       },
       (lines) => deriveWovenOrderPatch(lines, order)
     );
+    await this.notifyIfOrderCompleted(line.productionOrderId, order.status);
+    return res;
   }
   async reconcileRemainingThreads(lineId, input) {
     const line = await this.getLineOrThrow(lineId);
@@ -5274,6 +6409,27 @@ var WovenProductionService = class {
       input.threads,
       actorUserId
     );
+  }
+  async notifyIfOrderCompleted(productionOrderId, previousStatus) {
+    if (previousStatus === "complete") return;
+    try {
+      const updatedOrder = await productionOrderRepository.findById(productionOrderId);
+      if (updatedOrder && updatedOrder.status === "complete") {
+        mailService.sendProductionCompletedEmail({
+          productionNumber: updatedOrder.productionNumber,
+          soNumber: updatedOrder.soNumber,
+          poNumber: updatedOrder.poNumber,
+          companyName: updatedOrder.companyName,
+          brandName: updatedOrder.brandName,
+          totalQty: updatedOrder.totalQty,
+          completedAt: updatedOrder.completedAt
+        }).catch((err) => {
+          console.error("[WovenProductionService] Error sending completion email:", err);
+        });
+      }
+    } catch (err) {
+      console.error("[WovenProductionService] Failed to check completion status for email notification:", err);
+    }
   }
 };
 var wovenProductionService = new WovenProductionService();
@@ -5332,68 +6488,68 @@ var WovenProductionController = class {
 var wovenProductionController = new WovenProductionController();
 
 // src/api/validations/woven-production.validation.ts
-import { z as z13 } from "zod";
-var denierEnum = z13.enum(["45", "75", "100", "150"]);
-var threadPlanItemSchema = z13.object({
-  sortOrder: z13.coerce.number().int().min(1).max(8).optional(),
-  colorName: z13.string().trim().min(1, "Colour name is required"),
+import { z as z15 } from "zod";
+var denierEnum = z15.enum(["45", "75", "100", "150"]);
+var threadPlanItemSchema = z15.object({
+  sortOrder: z15.coerce.number().int().min(1).max(8).optional(),
+  colorName: z15.string().trim().min(1, "Colour name is required"),
   denier: denierEnum,
-  colorCode: z13.string().trim().min(1, "Colour code is required"),
-  weightKg: z13.coerce.number().positive("Weight must be greater than zero"),
-  threadStockId: z13.coerce.number().int().positive().optional().nullable()
+  colorCode: z15.string().trim().min(1, "Colour code is required"),
+  weightKg: z15.coerce.number().positive("Weight must be greater than zero"),
+  threadStockId: z15.coerce.number().int().positive().optional().nullable()
 });
-var planWovenLineSchema = z13.object({
-  body: z13.object({
-    quantity: z13.coerce.number().positive("Quantity must be greater than zero"),
-    weavingMachineId: z13.coerce.number().int().positive("A weaving machine is required"),
-    weavingOperatorId: z13.coerce.number().int().positive("A weaving operator is required"),
-    threads: z13.array(threadPlanItemSchema).min(1, "At least one thread colour is required").max(8, "A woven line can use at most 8 thread colours"),
-    actorUserId: z13.coerce.number().int().positive().optional()
+var planWovenLineSchema = z15.object({
+  body: z15.object({
+    quantity: z15.coerce.number().positive("Quantity must be greater than zero"),
+    weavingMachineId: z15.coerce.number().int().positive("A weaving machine is required"),
+    weavingOperatorId: z15.coerce.number().int().positive("A weaving operator is required"),
+    threads: z15.array(threadPlanItemSchema).min(1, "At least one thread colour is required").max(8, "A woven line can use at most 8 thread colours"),
+    actorUserId: z15.coerce.number().int().positive().optional()
   })
 });
-var updateWeavingSchema = z13.object({
-  body: z13.object({
-    wovenQty: z13.coerce.number().min(0).optional(),
-    started: z13.coerce.boolean().optional(),
-    ended: z13.coerce.boolean().optional(),
-    actorUserId: z13.coerce.number().int().positive().optional()
+var updateWeavingSchema = z15.object({
+  body: z15.object({
+    wovenQty: z15.coerce.number().min(0).optional(),
+    started: z15.coerce.boolean().optional(),
+    ended: z15.coerce.boolean().optional(),
+    actorUserId: z15.coerce.number().int().positive().optional()
   })
 });
-var updateWovenCuttingSchema = z13.object({
-  body: z13.object({
-    cutQty: z13.coerce.number().min(0).optional(),
-    cuttingOperatorId: z13.coerce.number().int().positive().optional(),
-    cuttingDate: z13.string().optional(),
-    actorUserId: z13.coerce.number().int().positive().optional()
+var updateWovenCuttingSchema = z15.object({
+  body: z15.object({
+    cutQty: z15.coerce.number().min(0).optional(),
+    cuttingOperatorId: z15.coerce.number().int().positive().optional(),
+    cuttingDate: z15.string().optional(),
+    actorUserId: z15.coerce.number().int().positive().optional()
   })
 });
-var updateWovenPackagingSchema = z13.object({
-  body: z13.object({
-    packagedQty: z13.coerce.number().min(0).optional(),
-    packagedWeightKg: z13.coerce.number().min(0).optional(),
-    packagingOperatorId: z13.coerce.number().int().positive().optional(),
-    packagingDate: z13.string().optional(),
-    actorUserId: z13.coerce.number().int().positive().optional()
+var updateWovenPackagingSchema = z15.object({
+  body: z15.object({
+    packagedQty: z15.coerce.number().min(0).optional(),
+    packagedWeightKg: z15.coerce.number().min(0).optional(),
+    packagingOperatorId: z15.coerce.number().int().positive().optional(),
+    packagingDate: z15.string().optional(),
+    actorUserId: z15.coerce.number().int().positive().optional()
   })
 });
-var reconcileRemainingThreadsSchema = z13.object({
-  body: z13.object({
-    threads: z13.array(
-      z13.object({
-        id: z13.coerce.number().int().positive(),
-        remainingWeightKg: z13.coerce.number().min(0, "Remaining weight cannot be negative")
+var reconcileRemainingThreadsSchema = z15.object({
+  body: z15.object({
+    threads: z15.array(
+      z15.object({
+        id: z15.coerce.number().int().positive(),
+        remainingWeightKg: z15.coerce.number().min(0, "Remaining weight cannot be negative")
       })
     ),
-    actorUserId: z13.coerce.number().int().positive().optional()
+    actorUserId: z15.coerce.number().int().positive().optional()
   })
 });
 
 // src/api/routes/woven-production.routes.ts
-import { z as z14 } from "zod";
-var router11 = Router11();
-var orderLineParamsSchema = z14.object({
-  id: z14.coerce.number().int().positive(),
-  lineId: z14.coerce.number().int().positive()
+import { z as z16 } from "zod";
+var router11 = Router12();
+var orderLineParamsSchema = z16.object({
+  id: z16.coerce.number().int().positive(),
+  lineId: z16.coerce.number().int().positive()
 });
 router11.get("/:id/overview", validateParams(idParamsSchema), wovenProductionController.getOverview);
 router11.post(
@@ -5436,16 +6592,17 @@ router11.patch(
 var woven_production_routes_default = router11;
 
 // src/api/routes/inventory.routes.ts
-import { Router as Router13 } from "express";
+import { Router as Router14 } from "express";
 
 // src/api/services/inventory.service.ts
 function calculateDerivedFields(inputs, material) {
   const totalRoll = inputs.cartonQty * inputs.rollsPerCarton;
+  const weightPerRoll = inputs.weightPerRoll ?? Number(material.weightPerRoll);
   return {
     totalRoll: String(totalRoll),
     totalRollPer200m: String(calculateTotalRollPer200m(totalRoll, inputs.rollLength)),
     invoiceWeight: String(calculateInvoiceWeight(inputs.netWeight, totalRoll, inputs.rollLength)),
-    localWeight: material.weightPerRoll
+    localWeight: String(weightPerRoll)
   };
 }
 var InventoryService = class {
@@ -5484,7 +6641,7 @@ var InventoryService = class {
   async updatePurchase(id, data) {
     const existing = await inventoryRepository.findPurchaseById(id);
     if (!existing) throw new NotFoundError(Messages.notFound(Entity.PURCHASE_RECORD));
-    const { materialCode, rollLength, netWeight, ...rest } = data;
+    const { materialCode, rollLength, netWeight, weightPerRoll, ...rest } = data;
     const updateData = { ...rest };
     const newMaterialCode = materialCode ?? existing.materialCode;
     const material = await materialRepository.findByCode(newMaterialCode);
@@ -5501,7 +6658,8 @@ var InventoryService = class {
         cartonQty: data.cartonQty ?? existing.cartonQty,
         rollsPerCarton: data.rollsPerCarton ?? existing.rollsPerCarton,
         rollLength: rollLength ?? Number(existing.rollLength),
-        netWeight: netWeight ?? Number(existing.netWeight)
+        netWeight: netWeight ?? Number(existing.netWeight),
+        weightPerRoll: weightPerRoll ?? (existing.localWeight != null ? Number(existing.localWeight) : void 0)
       },
       material
     );
@@ -5575,41 +6733,43 @@ var InventoryController = class {
 var inventoryController = new InventoryController();
 
 // src/api/validations/inventory.validation.ts
-import { z as z15 } from "zod";
-var createPurchaseSchema = z15.object({
-  body: z15.object({
-    reportDate: z15.string().min(1, "Report date is required"),
-    materialCode: z15.string().min(1, "Material code is required"),
-    invoiceNumber: z15.string().min(1, "Invoice number is required"),
-    vendor: z15.string().min(1, "Vendor is required"),
-    cartonQty: z15.coerce.number().int().positive("Carton quantity must be positive"),
-    rollsPerCarton: z15.coerce.number().int().positive("Rolls per carton must be positive"),
-    rollLength: z15.coerce.number().positive("Roll length must be positive"),
-    netWeight: z15.coerce.number().positive("Net weight must be positive"),
-    efs: z15.string().optional(),
-    gdNumber: z15.string().optional()
+import { z as z17 } from "zod";
+var createPurchaseSchema = z17.object({
+  body: z17.object({
+    reportDate: z17.string().min(1, "Report date is required"),
+    materialCode: z17.string().min(1, "Material code is required"),
+    invoiceNumber: z17.string().min(1, "Invoice number is required"),
+    vendor: z17.string().min(1, "Vendor is required"),
+    cartonQty: z17.coerce.number().int().positive("Carton quantity must be positive"),
+    rollsPerCarton: z17.coerce.number().int().positive("Rolls per carton must be positive"),
+    rollLength: z17.coerce.number().positive("Roll length must be positive"),
+    netWeight: z17.coerce.number().positive("Net weight must be positive"),
+    weightPerRoll: z17.coerce.number().positive("Weight per roll must be positive").optional(),
+    efs: z17.string().optional(),
+    gdNumber: z17.string().optional()
   })
 });
-var updatePurchaseSchema = z15.object({
-  body: z15.object({
-    reportDate: z15.string().min(1, "Report date is required").optional(),
-    materialCode: z15.string().min(1, "Material code is required").optional(),
-    invoiceNumber: z15.string().min(1, "Invoice number is required").optional(),
-    vendor: z15.string().min(1, "Vendor is required").optional(),
-    cartonQty: z15.coerce.number().int().positive("Carton quantity must be positive").optional(),
-    rollsPerCarton: z15.coerce.number().int().positive("Rolls per carton must be positive").optional(),
-    rollLength: z15.coerce.number().positive("Roll length must be positive").optional(),
-    netWeight: z15.coerce.number().positive("Net weight must be positive").optional(),
-    efs: z15.string().optional(),
-    gdNumber: z15.string().optional()
+var updatePurchaseSchema = z17.object({
+  body: z17.object({
+    reportDate: z17.string().min(1, "Report date is required").optional(),
+    materialCode: z17.string().min(1, "Material code is required").optional(),
+    invoiceNumber: z17.string().min(1, "Invoice number is required").optional(),
+    vendor: z17.string().min(1, "Vendor is required").optional(),
+    cartonQty: z17.coerce.number().int().positive("Carton quantity must be positive").optional(),
+    rollsPerCarton: z17.coerce.number().int().positive("Rolls per carton must be positive").optional(),
+    rollLength: z17.coerce.number().positive("Roll length must be positive").optional(),
+    netWeight: z17.coerce.number().positive("Net weight must be positive").optional(),
+    weightPerRoll: z17.coerce.number().positive("Weight per roll must be positive").optional(),
+    efs: z17.string().optional(),
+    gdNumber: z17.string().optional()
   })
 });
 
 // src/api/routes/inventory-roll.routes.ts
-import { Router as Router12 } from "express";
+import { Router as Router13 } from "express";
 
 // src/api/repositories/inventory-roll.repository.ts
-import { eq as eq11, asc as asc7, desc as desc6, and as and10, sql as sql7 } from "drizzle-orm";
+import { eq as eq13, asc as asc7, desc as desc8, and as and11, sql as sql8 } from "drizzle-orm";
 var LOW_STOCK_ROLLS = 5;
 var InventoryRollRepository = class {
   /** Joined with the material so the list can search and filter on description/type. */
@@ -5624,26 +6784,27 @@ var InventoryRollRepository = class {
     createdAt: inventoryRolls.createdAt,
     updatedAt: inventoryRolls.updatedAt,
     materialDescription: materials.description,
-    materialType: materials.type
+    materialType: materials.type,
+    weightPerRoll: materials.weightPerRoll
   };
   async findAll(filters) {
     const conditions = [];
-    if (filters?.materialCode) conditions.push(eq11(inventoryRolls.materialCode, filters.materialCode));
+    if (filters?.materialCode) conditions.push(eq13(inventoryRolls.materialCode, filters.materialCode));
     if (filters?.search) {
       const q = `%${filters.search}%`;
       conditions.push(
-        sql7`(${inventoryRolls.materialCode} ILIKE ${q} OR ${materials.description} ILIKE ${q})`
+        sql8`(${inventoryRolls.materialCode} ILIKE ${q} OR ${materials.description} ILIKE ${q})`
       );
     }
-    if (filters?.type) conditions.push(eq11(materials.type, filters.type));
-    if (filters?.stockStatus === "out") conditions.push(sql7`${inventoryRolls.balanceRolls} <= 0`);
+    if (filters?.type) conditions.push(eq13(materials.type, filters.type));
+    if (filters?.stockStatus === "out") conditions.push(sql8`${inventoryRolls.balanceRolls} <= 0`);
     if (filters?.stockStatus === "low") {
       conditions.push(
-        sql7`${inventoryRolls.balanceRolls} > 0 AND ${inventoryRolls.balanceRolls} < ${LOW_STOCK_ROLLS}`
+        sql8`${inventoryRolls.balanceRolls} > 0 AND ${inventoryRolls.balanceRolls} < ${LOW_STOCK_ROLLS}`
       );
     }
     if (filters?.stockStatus === "in") {
-      conditions.push(sql7`${inventoryRolls.balanceRolls} >= ${LOW_STOCK_ROLLS}`);
+      conditions.push(sql8`${inventoryRolls.balanceRolls} >= ${LOW_STOCK_ROLLS}`);
     }
     const column = {
       materialCode: inventoryRolls.materialCode,
@@ -5652,37 +6813,37 @@ var InventoryRollRepository = class {
       issuedRolls: inventoryRolls.issuedRolls,
       updatedAt: inventoryRolls.updatedAt
     }[filters?.sortBy ?? "materialCode"];
-    return db.select(this.baseSelect).from(inventoryRolls).leftJoin(materials, eq11(inventoryRolls.materialCode, materials.code)).where(conditions.length > 0 ? and10(...conditions) : void 0).orderBy(filters?.sortDir === "desc" ? desc6(column) : asc7(column)).limit(filters?.limit ?? 500).offset(filters?.offset ?? 0);
+    return db.select(this.baseSelect).from(inventoryRolls).leftJoin(materials, eq13(inventoryRolls.materialCode, materials.code)).where(conditions.length > 0 ? and11(...conditions) : void 0).orderBy(filters?.sortDir === "desc" ? desc8(column) : asc7(column)).limit(filters?.limit ?? 500).offset(filters?.offset ?? 0);
   }
   /** Total matching rows, for pagination. Mirrors `findAll`'s filters. */
   async countAll(filters) {
     const conditions = [];
-    if (filters?.materialCode) conditions.push(eq11(inventoryRolls.materialCode, filters.materialCode));
+    if (filters?.materialCode) conditions.push(eq13(inventoryRolls.materialCode, filters.materialCode));
     if (filters?.search) {
       const q = `%${filters.search}%`;
       conditions.push(
-        sql7`(${inventoryRolls.materialCode} ILIKE ${q} OR ${materials.description} ILIKE ${q})`
+        sql8`(${inventoryRolls.materialCode} ILIKE ${q} OR ${materials.description} ILIKE ${q})`
       );
     }
-    if (filters?.type) conditions.push(eq11(materials.type, filters.type));
-    if (filters?.stockStatus === "out") conditions.push(sql7`${inventoryRolls.balanceRolls} <= 0`);
+    if (filters?.type) conditions.push(eq13(materials.type, filters.type));
+    if (filters?.stockStatus === "out") conditions.push(sql8`${inventoryRolls.balanceRolls} <= 0`);
     if (filters?.stockStatus === "low") {
       conditions.push(
-        sql7`${inventoryRolls.balanceRolls} > 0 AND ${inventoryRolls.balanceRolls} < ${LOW_STOCK_ROLLS}`
+        sql8`${inventoryRolls.balanceRolls} > 0 AND ${inventoryRolls.balanceRolls} < ${LOW_STOCK_ROLLS}`
       );
     }
     if (filters?.stockStatus === "in") {
-      conditions.push(sql7`${inventoryRolls.balanceRolls} >= ${LOW_STOCK_ROLLS}`);
+      conditions.push(sql8`${inventoryRolls.balanceRolls} >= ${LOW_STOCK_ROLLS}`);
     }
-    const [row] = await db.select({ count: sql7`count(*)` }).from(inventoryRolls).leftJoin(materials, eq11(inventoryRolls.materialCode, materials.code)).where(conditions.length > 0 ? and10(...conditions) : void 0);
+    const [row] = await db.select({ count: sql8`count(*)` }).from(inventoryRolls).leftJoin(materials, eq13(inventoryRolls.materialCode, materials.code)).where(conditions.length > 0 ? and11(...conditions) : void 0);
     return Number(row?.count ?? 0);
   }
   async findByMaterialCode(materialCode) {
-    const [roll] = await db.select().from(inventoryRolls).where(eq11(inventoryRolls.materialCode, materialCode));
+    const [roll] = await db.select().from(inventoryRolls).where(eq13(inventoryRolls.materialCode, materialCode));
     return roll;
   }
   async findMovements(materialCode, limit = 200) {
-    return db.select().from(inventoryRollMovements).where(materialCode ? eq11(inventoryRollMovements.materialCode, materialCode) : void 0).orderBy(desc6(inventoryRollMovements.createdAt)).limit(limit);
+    return db.select().from(inventoryRollMovements).where(materialCode ? eq13(inventoryRollMovements.materialCode, materialCode) : void 0).orderBy(desc8(inventoryRollMovements.createdAt)).limit(limit);
   }
   /**
    * Applies a signed roll change to one ledger and records the movement explaining it.
@@ -5690,7 +6851,7 @@ var InventoryRollRepository = class {
    * go below zero, and allowing it would corrupt every figure downstream.
    */
   async moveTx(tx, rollId, rolls, movementType, ref) {
-    const [locked] = await tx.select().from(inventoryRolls).where(eq11(inventoryRolls.id, rollId)).for("update");
+    const [locked] = await tx.select().from(inventoryRolls).where(eq13(inventoryRolls.id, rollId)).for("update");
     if (!locked) throw new NotFoundError("Inventory roll not found");
     const next = Number(locked.balanceRolls) + rolls;
     if (next < -1e-4) {
@@ -5703,7 +6864,7 @@ var InventoryRollRepository = class {
       receivedRolls: rolls > 0 ? String(Number(locked.receivedRolls) + rolls) : locked.receivedRolls,
       issuedRolls: rolls < 0 ? String(Number(locked.issuedRolls) - rolls) : locked.issuedRolls,
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq11(inventoryRolls.id, rollId));
+    }).where(eq13(inventoryRolls.id, rollId));
     await tx.insert(inventoryRollMovements).values({
       inventoryRollId: rollId,
       materialCode: locked.materialCode,
@@ -5740,13 +6901,13 @@ var InventoryRollRepository = class {
    */
   async updateWithHistory(materialCode, patch, note, actorUserId) {
     return db.transaction(async (tx) => {
-      const [locked] = await tx.select().from(inventoryRolls).where(eq11(inventoryRolls.materialCode, materialCode)).for("update");
+      const [locked] = await tx.select().from(inventoryRolls).where(eq13(inventoryRolls.materialCode, materialCode)).for("update");
       if (!locked) throw new NotFoundError("Inventory roll not found");
       const nextBalance = patch.balanceRolls !== void 0 ? Number(patch.balanceRolls) : Number(locked.balanceRolls);
       if (nextBalance < 0) {
         throw new BadRequestError("Balance rolls cannot be negative");
       }
-      const [updated] = await tx.update(inventoryRolls).set({ ...patch, updatedAt: /* @__PURE__ */ new Date() }).where(eq11(inventoryRolls.materialCode, materialCode)).returning();
+      const [updated] = await tx.update(inventoryRolls).set({ ...patch, updatedAt: /* @__PURE__ */ new Date() }).where(eq13(inventoryRolls.materialCode, materialCode)).returning();
       const delta = nextBalance - Number(locked.balanceRolls);
       if (Math.abs(delta) > 1e-4) {
         await tx.insert(inventoryRollMovements).values({
@@ -5763,7 +6924,7 @@ var InventoryRollRepository = class {
     });
   }
   async delete(materialCode) {
-    await db.delete(inventoryRolls).where(eq11(inventoryRolls.materialCode, materialCode));
+    await db.delete(inventoryRolls).where(eq13(inventoryRolls.materialCode, materialCode));
   }
 };
 var inventoryRollRepository = new InventoryRollRepository();
@@ -5928,48 +7089,48 @@ var InventoryRollController = class {
 var inventoryRollController = new InventoryRollController();
 
 // src/api/validations/inventory-roll.validation.ts
-import { z as z16 } from "zod";
-var createInventoryRollSchema = z16.object({
-  body: z16.object({
-    materialCode: z16.string().trim().min(1, "Material code is required"),
-    openingStock: z16.coerce.number().min(0, "Opening stock cannot be negative").optional(),
-    receivedRolls: z16.coerce.number().min(0, "Received rolls cannot be negative").optional(),
-    issuedRolls: z16.coerce.number().min(0, "Issued rolls cannot be negative").optional(),
-    rollPerKg: z16.coerce.number().min(0, "Rolls per kg cannot be negative").optional(),
-    actorUserId: z16.coerce.number().int().positive().optional()
+import { z as z18 } from "zod";
+var createInventoryRollSchema = z18.object({
+  body: z18.object({
+    materialCode: z18.string().trim().min(1, "Material code is required"),
+    openingStock: z18.coerce.number().min(0, "Opening stock cannot be negative").optional(),
+    receivedRolls: z18.coerce.number().min(0, "Received rolls cannot be negative").optional(),
+    issuedRolls: z18.coerce.number().min(0, "Issued rolls cannot be negative").optional(),
+    rollPerKg: z18.coerce.number().min(0, "Rolls per kg cannot be negative").optional(),
+    actorUserId: z18.coerce.number().int().positive().optional()
   })
 });
-var updateInventoryRollSchema = z16.object({
-  body: z16.object({
-    openingStock: z16.coerce.number().min(0, "Opening stock cannot be negative").optional(),
-    receivedRolls: z16.coerce.number().min(0, "Received rolls cannot be negative").optional(),
-    issuedRolls: z16.coerce.number().min(0, "Issued rolls cannot be negative").optional(),
-    rollPerKg: z16.coerce.number().min(0, "Rolls per kg cannot be negative").optional(),
+var updateInventoryRollSchema = z18.object({
+  body: z18.object({
+    openingStock: z18.coerce.number().min(0, "Opening stock cannot be negative").optional(),
+    receivedRolls: z18.coerce.number().min(0, "Received rolls cannot be negative").optional(),
+    issuedRolls: z18.coerce.number().min(0, "Issued rolls cannot be negative").optional(),
+    rollPerKg: z18.coerce.number().min(0, "Rolls per kg cannot be negative").optional(),
     /** Reason for the adjustment — recorded on the movement row. */
-    note: z16.string().max(500).optional(),
-    actorUserId: z16.coerce.number().int().positive().optional()
+    note: z18.string().max(500).optional(),
+    actorUserId: z18.coerce.number().int().positive().optional()
   })
 });
-var inventoryRollParamsSchema = z16.object({
-  materialCode: z16.string().min(1, "Material code is required")
+var inventoryRollParamsSchema = z18.object({
+  materialCode: z18.string().min(1, "Material code is required")
 });
-var listInventoryRollsQuerySchema = z16.object({
-  materialCode: z16.string().optional(),
-  search: z16.string().optional(),
-  type: z16.string().optional(),
-  stockStatus: z16.enum(["in", "low", "out"]).optional(),
-  sortBy: z16.enum(["materialCode", "balanceRolls", "receivedRolls", "issuedRolls", "updatedAt"]).optional(),
-  sortDir: z16.enum(["asc", "desc"]).optional(),
-  limit: z16.coerce.number().int().positive().max(500).optional(),
-  offset: z16.coerce.number().int().min(0).optional()
+var listInventoryRollsQuerySchema = z18.object({
+  materialCode: z18.string().optional(),
+  search: z18.string().optional(),
+  type: z18.string().optional(),
+  stockStatus: z18.enum(["in", "low", "out"]).optional(),
+  sortBy: z18.enum(["materialCode", "balanceRolls", "receivedRolls", "issuedRolls", "updatedAt"]).optional(),
+  sortDir: z18.enum(["asc", "desc"]).optional(),
+  limit: z18.coerce.number().int().positive().max(500).optional(),
+  offset: z18.coerce.number().int().min(0).optional()
 });
-var listRollMovementsQuerySchema = z16.object({
-  materialCode: z16.string().optional(),
-  limit: z16.coerce.number().int().positive().max(500).optional()
+var listRollMovementsQuerySchema = z18.object({
+  materialCode: z18.string().optional(),
+  limit: z18.coerce.number().int().positive().max(500).optional()
 });
 
 // src/api/routes/inventory-roll.routes.ts
-var router12 = Router12();
+var router12 = Router13();
 router12.get("/", validateQuery(listInventoryRollsQuerySchema), inventoryRollController.getInventoryRolls);
 router12.get(
   "/movements",
@@ -5996,7 +7157,7 @@ router12.delete(
 var inventory_roll_routes_default = router12;
 
 // src/api/routes/inventory.routes.ts
-var router13 = Router13();
+var router13 = Router14();
 router13.use("/rolls", inventory_roll_routes_default);
 router13.post("/purchases", validateRequest(createPurchaseSchema), inventoryController.createPurchase);
 router13.get("/purchases", validateQuery(listPurchasesQuerySchema), inventoryController.getPurchases);
@@ -6007,7 +7168,7 @@ router13.get("/stock", validateQuery(listStockQuerySchema), inventoryController.
 var inventory_routes_default = router13;
 
 // src/api/routes/thread-inventory.routes.ts
-import { Router as Router14 } from "express";
+import { Router as Router15 } from "express";
 
 // src/api/services/thread-inventory.service.ts
 var ThreadInventoryService = class {
@@ -6283,70 +7444,70 @@ var ThreadInventoryController = class {
 var threadInventoryController = new ThreadInventoryController();
 
 // src/api/validations/thread-inventory.validation.ts
-import { z as z17 } from "zod";
-var denierEnum2 = z17.enum(["45", "75", "100", "150"]);
-var baseColorEnum = z17.enum(["White", "Black"]);
-var createThreadPurchaseSchema = z17.object({
-  body: z17.object({
-    receivedDate: z17.string().min(1, "Received date is required"),
+import { z as z19 } from "zod";
+var denierEnum2 = z19.enum(["45", "75", "100", "150"]);
+var baseColorEnum = z19.enum(["White", "Black"]);
+var createThreadPurchaseSchema = z19.object({
+  body: z19.object({
+    receivedDate: z19.string().min(1, "Received date is required"),
     denier: denierEnum2,
     threadColor: baseColorEnum,
-    vendor: z17.string().trim().min(1, "Vendor is required"),
-    invoiceNumber: z17.string().trim().min(1, "Invoice number is required"),
-    totalCtns: z17.coerce.number().int().positive("Total cartons must be greater than 0"),
-    weightPerCtnKg: z17.coerce.number().positive("Weight per carton must be greater than 0"),
-    notes: z17.string().optional(),
-    actorUserId: z17.coerce.number().int().positive().optional()
+    vendor: z19.string().trim().min(1, "Vendor is required"),
+    invoiceNumber: z19.string().trim().min(1, "Invoice number is required"),
+    totalCtns: z19.coerce.number().int().positive("Total cartons must be greater than 0"),
+    weightPerCtnKg: z19.coerce.number().positive("Weight per carton must be greater than 0"),
+    notes: z19.string().optional(),
+    actorUserId: z19.coerce.number().int().positive().optional()
   })
 });
-var createDyeBatchSchema = z17.object({
-  body: z17.object({
+var createDyeBatchSchema = z19.object({
+  body: z19.object({
     denier: denierEnum2,
     fromColorName: baseColorEnum,
-    toColorName: z17.string().trim().min(1, "Colour name is required"),
-    toColorCode: z17.string().trim().min(1, "Colour code is required"),
-    inputWeightKg: z17.coerce.number().positive("Input weight must be greater than 0"),
-    outputWeightKg: z17.coerce.number().positive("Output weight must be greater than 0"),
-    notes: z17.string().optional(),
-    actorUserId: z17.coerce.number().int().positive().optional()
+    toColorName: z19.string().trim().min(1, "Colour name is required"),
+    toColorCode: z19.string().trim().min(1, "Colour code is required"),
+    inputWeightKg: z19.coerce.number().positive("Input weight must be greater than 0"),
+    outputWeightKg: z19.coerce.number().positive("Output weight must be greater than 0"),
+    notes: z19.string().optional(),
+    actorUserId: z19.coerce.number().int().positive().optional()
   })
 });
-var createThreadStockSchema = z17.object({
-  body: z17.object({
-    stockType: z17.enum(["primary", "secondary"]),
+var createThreadStockSchema = z19.object({
+  body: z19.object({
+    stockType: z19.enum(["primary", "secondary"]),
     denier: denierEnum2,
-    colorName: z17.string().trim().min(1, "Colour name is required"),
+    colorName: z19.string().trim().min(1, "Colour name is required"),
     /** Required for dyed (secondary) stock; ignored for undyed. */
-    colorCode: z17.string().trim().optional().nullable(),
-    openingKg: z17.coerce.number().min(0, "Opening balance cannot be negative").optional(),
-    actorUserId: z17.coerce.number().int().positive().optional()
+    colorCode: z19.string().trim().optional().nullable(),
+    openingKg: z19.coerce.number().min(0, "Opening balance cannot be negative").optional(),
+    actorUserId: z19.coerce.number().int().positive().optional()
   })
 });
-var updateThreadStockSchema = z17.object({
-  body: z17.object({
-    colorName: z17.string().trim().min(1).optional(),
-    colorCode: z17.string().trim().optional().nullable(),
-    balanceKg: z17.coerce.number().min(0, "Balance cannot be negative").optional(),
-    note: z17.string().max(500).optional(),
-    actorUserId: z17.coerce.number().int().positive().optional()
+var updateThreadStockSchema = z19.object({
+  body: z19.object({
+    colorName: z19.string().trim().min(1).optional(),
+    colorCode: z19.string().trim().optional().nullable(),
+    balanceKg: z19.coerce.number().min(0, "Balance cannot be negative").optional(),
+    note: z19.string().max(500).optional(),
+    actorUserId: z19.coerce.number().int().positive().optional()
   })
 });
-var listThreadStocksQuerySchema = z17.object({
-  stockType: z17.enum(["primary", "secondary"]).optional(),
+var listThreadStocksQuerySchema = z19.object({
+  stockType: z19.enum(["primary", "secondary"]).optional(),
   denier: denierEnum2.optional(),
-  colorName: z17.string().optional()
+  colorName: z19.string().optional()
 });
-var listThreadPurchasesQuerySchema = z17.object({
-  vendor: z17.string().optional(),
+var listThreadPurchasesQuerySchema = z19.object({
+  vendor: z19.string().optional(),
   denier: denierEnum2.optional()
 });
-var listThreadMovementsQuerySchema = z17.object({
-  threadStockId: z17.coerce.number().int().positive().optional(),
-  limit: z17.coerce.number().int().positive().max(500).optional()
+var listThreadMovementsQuerySchema = z19.object({
+  threadStockId: z19.coerce.number().int().positive().optional(),
+  limit: z19.coerce.number().int().positive().max(500).optional()
 });
 
 // src/api/routes/thread-inventory.routes.ts
-var router14 = Router14();
+var router14 = Router15();
 router14.get("/stocks", validateQuery(listThreadStocksQuerySchema), threadInventoryController.getStocks);
 router14.get("/stocks/summary", threadInventoryController.getStockSummary);
 router14.post("/stocks", validateRequest(createThreadStockSchema), threadInventoryController.createStock);
@@ -6381,51 +7542,672 @@ router14.get("/dye-batches", threadInventoryController.getDyeBatches);
 router14.post("/dye-batches", validateRequest(createDyeBatchSchema), threadInventoryController.createDyeBatch);
 var thread_inventory_routes_default = router14;
 
+// src/api/routes/thread-service-provider.routes.ts
+import { Router as Router16 } from "express";
+
+// src/api/repositories/thread-service-provider.repository.ts
+import { asc as asc8, eq as eq14 } from "drizzle-orm";
+var ThreadServiceProviderRepository = class {
+  findAll() {
+    return db.select().from(threadServiceProviders).orderBy(asc8(threadServiceProviders.name));
+  }
+  async findById(id) {
+    const [row] = await db.select().from(threadServiceProviders).where(eq14(threadServiceProviders.id, id));
+    return row;
+  }
+  async create(data) {
+    const [row] = await db.insert(threadServiceProviders).values(data).returning();
+    return row;
+  }
+  async update(id, data) {
+    const [row] = await db.update(threadServiceProviders).set({ ...data, updatedAt: /* @__PURE__ */ new Date() }).where(eq14(threadServiceProviders.id, id)).returning();
+    return row;
+  }
+  async remove(id) {
+    const [row] = await db.delete(threadServiceProviders).where(eq14(threadServiceProviders.id, id)).returning();
+    return row;
+  }
+};
+var threadServiceProviderRepository = new ThreadServiceProviderRepository();
+
+// src/api/services/thread-service-provider.service.ts
+var ThreadServiceProviderService = class {
+  getAll() {
+    return threadServiceProviderRepository.findAll();
+  }
+  async getOne(id) {
+    const row = await threadServiceProviderRepository.findById(id);
+    if (!row) throw new NotFoundError(Messages.notFound(Entity.THREAD_SERVICE_PROVIDER));
+    return row;
+  }
+  create(data) {
+    return threadServiceProviderRepository.create(data);
+  }
+  async update(id, data) {
+    await this.getOne(id);
+    return threadServiceProviderRepository.update(id, data);
+  }
+  async remove(id) {
+    await this.getOne(id);
+    await threadServiceProviderRepository.remove(id);
+  }
+};
+var threadServiceProviderService = new ThreadServiceProviderService();
+
+// src/api/controllers/thread-service-provider.controller.ts
+var ThreadServiceProviderController = class {
+  getAll = asyncHandler(async (_req, res) => {
+    res.json({ data: await threadServiceProviderService.getAll() });
+  });
+  create = asyncHandler(async (req, res) => {
+    const input = req.validatedBody ?? req.body;
+    res.status(201).json({ data: await threadServiceProviderService.create(input) });
+  });
+  update = asyncHandler(async (req, res) => {
+    const { id } = req.validatedParams ?? req.params;
+    const input = req.validatedBody ?? req.body;
+    res.json({ data: await threadServiceProviderService.update(Number(id), input) });
+  });
+  remove = asyncHandler(async (req, res) => {
+    const { id } = req.validatedParams ?? req.params;
+    await threadServiceProviderService.remove(Number(id));
+    res.status(204).send();
+  });
+};
+var threadServiceProviderController = new ThreadServiceProviderController();
+
+// src/api/validations/thread-service-provider.validation.ts
+import { z as z20 } from "zod";
+var createThreadServiceProviderSchema = z20.object({
+  body: z20.object({
+    name: z20.string().trim().min(1, "Name is required"),
+    contact: z20.string().trim().max(100).optional(),
+    address: z20.string().trim().optional(),
+    notes: z20.string().trim().optional()
+  })
+});
+var updateThreadServiceProviderSchema = z20.object({
+  body: createThreadServiceProviderSchema.shape.body.partial()
+});
+
+// src/api/routes/thread-service-provider.routes.ts
+var router15 = Router16();
+router15.get("/", threadServiceProviderController.getAll);
+router15.post("/", validateRequest(createThreadServiceProviderSchema), threadServiceProviderController.create);
+router15.put(
+  "/:id",
+  validateParams(idParamsSchema),
+  validateRequest(updateThreadServiceProviderSchema),
+  threadServiceProviderController.update
+);
+router15.delete("/:id", validateParams(idParamsSchema), threadServiceProviderController.remove);
+var thread_service_provider_routes_default = router15;
+
+// src/api/routes/thread-dyeing.routes.ts
+import { Router as Router17 } from "express";
+
+// src/api/repositories/thread-dyeing.repository.ts
+import { desc as desc9, eq as eq15, inArray as inArray5 } from "drizzle-orm";
+var ThreadDyeingRepository = class {
+  async findSends() {
+    return db.select({
+      id: threadDyeingSends.id,
+      serviceProviderId: threadDyeingSends.serviceProviderId,
+      serviceProviderName: threadServiceProviders.name,
+      sendingDate: threadDyeingSends.sendingDate,
+      senderTrackingNumber: threadDyeingSends.senderTrackingNumber,
+      denier: threadDyeingSends.denier,
+      baseThreadColor: threadDyeingSends.baseThreadColor,
+      totalWeightSent: threadDyeingSends.totalWeightSent,
+      status: threadDyeingSends.status,
+      createdAt: threadDyeingSends.createdAt
+    }).from(threadDyeingSends).leftJoin(threadServiceProviders, eq15(threadDyeingSends.serviceProviderId, threadServiceProviders.id)).orderBy(desc9(threadDyeingSends.sendingDate), desc9(threadDyeingSends.id));
+  }
+  async findAllocationsForSends(sendIds) {
+    if (sendIds.length === 0) return [];
+    return db.select().from(threadDyeingAllocations).where(inArray5(threadDyeingAllocations.threadDyeingSendId, sendIds));
+  }
+  async findReceivesForSends(sendIds) {
+    if (sendIds.length === 0) return [];
+    return db.select().from(threadDyeingReceives).where(inArray5(threadDyeingReceives.threadDyeingSendId, sendIds));
+  }
+  async findSendById(id) {
+    const [send] = await db.select().from(threadDyeingSends).where(eq15(threadDyeingSends.id, id));
+    return send;
+  }
+  /**
+   * Records a send + its colour allocations and deducts the total from Undyed (primary)
+   * stock — all atomic. The stock debit runs through the shared `moveStockTx`, so it locks
+   * the ledger row and refuses to go negative just like every other thread outflow.
+   */
+  async sendForDyeingTransaction(send, allocations, actorUserId) {
+    return db.transaction(async (tx) => {
+      const [sendRow] = await tx.insert(threadDyeingSends).values(send).returning();
+      const allocRows = await tx.insert(threadDyeingAllocations).values(allocations.map((a) => ({ ...a, threadDyeingSendId: sendRow.id }))).returning();
+      const primary = await threadInventoryRepository.getOrCreateStockTx(tx, {
+        stockType: "primary",
+        denier: send.denier,
+        colorName: send.baseThreadColor,
+        colorCode: null
+      });
+      await threadInventoryRepository.moveStockTx(
+        tx,
+        primary.id,
+        -Number(send.totalWeightSent),
+        "dye_consume",
+        {
+          referenceType: "thread_dyeing_send",
+          referenceId: sendRow.id,
+          note: `Sent for dyeing (${allocRows.length} colour${allocRows.length === 1 ? "" : "s"})`,
+          actorUserId
+        }
+      );
+      return { ...sendRow, allocations: allocRows };
+    });
+  }
+  /**
+   * Receives a send back dyed: one Dyed (secondary) stock credit per allocation colour, then
+   * advances the send status — all atomic. Re-receiving a completed send is refused.
+   */
+  async receiveDyedTransaction(sendId, receive, received, actorUserId) {
+    return db.transaction(async (tx) => {
+      const [send] = await tx.select().from(threadDyeingSends).where(eq15(threadDyeingSends.id, sendId)).for("update");
+      if (!send) throw new NotFoundError("Thread dyeing send not found");
+      if (send.status === "received") {
+        throw new BadRequestError("This send has already been received in full");
+      }
+      const allocations = await tx.select().from(threadDyeingAllocations).where(eq15(threadDyeingAllocations.threadDyeingSendId, sendId));
+      const allocById = new Map(allocations.map((a) => [a.id, a]));
+      const [receiveRow] = await tx.insert(threadDyeingReceives).values({ ...receive, threadDyeingSendId: sendId }).returning();
+      for (const r of received) {
+        const alloc = allocById.get(r.id);
+        if (!alloc) throw new BadRequestError(`Allocation ${r.id} does not belong to this send`);
+        const code = r.colorCode?.trim() || alloc.colorCode?.trim() || alloc.pantone?.trim() || alloc.colorName.trim();
+        await tx.update(threadDyeingAllocations).set({ colorCode: code, receivedWeight: String(r.receivedWeight) }).where(eq15(threadDyeingAllocations.id, alloc.id));
+        const secondary = await threadInventoryRepository.getOrCreateStockTx(tx, {
+          stockType: "secondary",
+          denier: send.denier,
+          colorName: alloc.colorName,
+          colorCode: code
+        });
+        await threadInventoryRepository.moveStockTx(tx, secondary.id, r.receivedWeight, "dye_produce", {
+          referenceType: "thread_dyeing_receive",
+          referenceId: receiveRow.id,
+          note: `Received dyed ${alloc.colorName} (${code}) from provider`,
+          actorUserId
+        });
+      }
+      await tx.update(threadDyeingSends).set({ status: "received", updatedAt: /* @__PURE__ */ new Date() }).where(eq15(threadDyeingSends.id, sendId));
+      return receiveRow;
+    });
+  }
+};
+var threadDyeingRepository = new ThreadDyeingRepository();
+
+// src/api/services/thread-dyeing.service.ts
+var ThreadDyeingService = class {
+  /** Sends with their colour allocations and receive records folded in. */
+  async listSends() {
+    const sends = await threadDyeingRepository.findSends();
+    const ids = sends.map((s) => s.id);
+    const [allocations, receives] = await Promise.all([
+      threadDyeingRepository.findAllocationsForSends(ids),
+      threadDyeingRepository.findReceivesForSends(ids)
+    ]);
+    return sends.map((s) => ({
+      ...s,
+      totalWeightSent: Number(s.totalWeightSent),
+      allocations: allocations.filter((a) => a.threadDyeingSendId === s.id).map((a) => ({ ...a, allocatedWeight: Number(a.allocatedWeight) })),
+      receives: receives.filter((r) => r.threadDyeingSendId === s.id)
+    }));
+  }
+  /**
+   * Send undyed thread for dyeing. Allocation weights must sum to the total sent (this is the
+   * hard rule), and the total is deducted from undyed stock in the repository transaction.
+   */
+  async sendForDyeing(input) {
+    const provider = await threadServiceProviderRepository.findById(input.serviceProviderId);
+    if (!provider) throw new NotFoundError(Messages.notFound(Entity.THREAD_SERVICE_PROVIDER));
+    const sumAllocated = input.allocations.reduce((a, x) => a + x.allocatedWeight, 0);
+    if (Math.abs(sumAllocated - input.totalWeightSent) > 5e-4) {
+      throw new BadRequestError(
+        `Allocated colour weights (${sumAllocated.toFixed(3)} kg) must equal the total weight sent (${input.totalWeightSent.toFixed(3)} kg)`
+      );
+    }
+    return threadDyeingRepository.sendForDyeingTransaction(
+      {
+        serviceProviderId: input.serviceProviderId,
+        sendingDate: input.sendingDate,
+        senderTrackingNumber: input.senderTrackingNumber,
+        denier: input.denier,
+        baseThreadColor: input.baseThreadColor,
+        totalWeightSent: String(input.totalWeightSent)
+      },
+      input.allocations.map((a) => ({
+        colorName: a.colorName,
+        pantone: a.pantone,
+        colorCode: a.colorCode,
+        allocatedWeight: String(a.allocatedWeight)
+      })),
+      input.actorUserId
+    );
+  }
+  /** Receive a send back dyed — credits dyed stock per allocation using the entered
+   *  after-weight, and finalises each colour code. */
+  async receiveDyed(sendId, input) {
+    const send = await threadDyeingRepository.findSendById(sendId);
+    if (!send) throw new NotFoundError(Messages.notFound(Entity.THREAD_DYEING_SEND));
+    return threadDyeingRepository.receiveDyedTransaction(
+      sendId,
+      {
+        receivingDate: input.receivingDate,
+        receiverTrackingNumber: input.receiverTrackingNumber,
+        invoiceNumber: input.invoiceNumber
+      },
+      input.allocations.map((a) => ({
+        id: a.id,
+        colorCode: a.colorCode,
+        receivedWeight: a.receivedWeight
+      })),
+      input.actorUserId
+    );
+  }
+};
+var threadDyeingService = new ThreadDyeingService();
+
+// src/api/controllers/thread-dyeing.controller.ts
+var ThreadDyeingController = class {
+  listSends = asyncHandler(async (_req, res) => {
+    res.json({ data: await threadDyeingService.listSends() });
+  });
+  send = asyncHandler(async (req, res) => {
+    const input = req.validatedBody ?? req.body;
+    res.status(201).json({ data: await threadDyeingService.sendForDyeing(input) });
+  });
+  receive = asyncHandler(async (req, res) => {
+    const { id } = req.validatedParams ?? req.params;
+    const input = req.validatedBody ?? req.body;
+    res.status(201).json({ data: await threadDyeingService.receiveDyed(Number(id), input) });
+  });
+};
+var threadDyeingController = new ThreadDyeingController();
+
+// src/api/validations/thread-dyeing.validation.ts
+import { z as z21 } from "zod";
+var denierEnum3 = z21.enum(["45", "75", "100", "150"]);
+var baseColorEnum2 = z21.enum(["White", "Black"]);
+var createDyeingSendSchema = z21.object({
+  body: z21.object({
+    serviceProviderId: z21.coerce.number().int().positive("Service provider is required"),
+    sendingDate: z21.string().min(1, "Sending date is required"),
+    senderTrackingNumber: z21.string().trim().optional(),
+    denier: denierEnum3,
+    baseThreadColor: baseColorEnum2,
+    totalWeightSent: z21.coerce.number().positive("Total weight sent must be greater than 0"),
+    allocations: z21.array(
+      z21.object({
+        colorName: z21.string().trim().min(1, "Colour name is required"),
+        pantone: z21.string().trim().optional(),
+        colorCode: z21.string().trim().optional(),
+        allocatedWeight: z21.coerce.number().positive("Allocated weight must be greater than 0")
+      })
+    ).min(1, "At least one colour allocation is required"),
+    actorUserId: z21.coerce.number().int().positive().optional()
+  })
+});
+var receiveDyeingSchema = z21.object({
+  body: z21.object({
+    receivingDate: z21.string().min(1, "Receiving date is required"),
+    receiverTrackingNumber: z21.string().trim().optional(),
+    invoiceNumber: z21.string().trim().optional(),
+    allocations: z21.array(
+      z21.object({
+        id: z21.coerce.number().int().positive(),
+        colorCode: z21.string().trim().optional(),
+        receivedWeight: z21.coerce.number().positive("Received weight must be greater than 0")
+      })
+    ).min(1, "At least one colour must be received"),
+    actorUserId: z21.coerce.number().int().positive().optional()
+  })
+});
+
+// src/api/routes/thread-dyeing.routes.ts
+var router16 = Router17();
+router16.get("/sends", threadDyeingController.listSends);
+router16.post("/sends", validateRequest(createDyeingSendSchema), threadDyeingController.send);
+router16.post(
+  "/sends/:id/receive",
+  validateParams(idParamsSchema),
+  validateRequest(receiveDyeingSchema),
+  threadDyeingController.receive
+);
+var thread_dyeing_routes_default = router16;
+
+// src/api/routes/ink.routes.ts
+import { Router as Router18 } from "express";
+
+// src/api/repositories/ink.repository.ts
+import { desc as desc10, eq as eq16, sql as sql9 } from "drizzle-orm";
+var InkRepository = class {
+  /* ---------------- Purchases ---------------- */
+  listPurchases() {
+    return db.select().from(inkPurchases).orderBy(desc10(inkPurchases.reportDate), desc10(inkPurchases.id));
+  }
+  async findPurchaseById(id) {
+    const [row] = await db.select().from(inkPurchases).where(eq16(inkPurchases.id, id));
+    return row;
+  }
+  async createPurchase(data) {
+    const [row] = await db.insert(inkPurchases).values(data).returning();
+    return row;
+  }
+  async updatePurchase(id, data) {
+    const [row] = await db.update(inkPurchases).set(data).where(eq16(inkPurchases.id, id)).returning();
+    return row;
+  }
+  async removePurchase(id) {
+    const [row] = await db.delete(inkPurchases).where(eq16(inkPurchases.id, id)).returning();
+    return row;
+  }
+  /* ---------------- Consumptions ---------------- */
+  listConsumptions() {
+    return db.select({
+      id: inkConsumptions.id,
+      materialCode: inkConsumptions.materialCode,
+      qtyAssigned: inkConsumptions.qtyAssigned,
+      operatorId: inkConsumptions.operatorId,
+      operatorName: inkConsumptions.operatorName,
+      weight: inkConsumptions.weight,
+      note: inkConsumptions.note,
+      consumedAt: inkConsumptions.consumedAt
+    }).from(inkConsumptions).orderBy(desc10(inkConsumptions.consumedAt), desc10(inkConsumptions.id));
+  }
+  async createConsumption(data) {
+    const [row] = await db.insert(inkConsumptions).values(data).returning();
+    return row;
+  }
+  async removeConsumption(id) {
+    const [row] = await db.delete(inkConsumptions).where(eq16(inkConsumptions.id, id)).returning();
+    return row;
+  }
+  /* ---------------- Derived stock ---------------- */
+  /**
+   * Live stock per material code. LEFT JOIN so a code that has only purchases (or, in
+   * theory, only consumptions) still surfaces; COALESCE keeps the arithmetic null-safe.
+   */
+  async stockLevels() {
+    const purchased = db.select({
+      materialCode: inkPurchases.materialCode,
+      purchasedQty: sql9`COALESCE(SUM(${inkPurchases.quantity}), 0)`.as("purchased_qty"),
+      purchasedWeight: sql9`COALESCE(SUM(${inkPurchases.totalWeight}), 0)`.as("purchased_weight")
+    }).from(inkPurchases).groupBy(inkPurchases.materialCode).as("purchased");
+    const consumed = db.select({
+      materialCode: inkConsumptions.materialCode,
+      consumedQty: sql9`COALESCE(SUM(${inkConsumptions.qtyAssigned}), 0)`.as("consumed_qty"),
+      consumedWeight: sql9`COALESCE(SUM(${inkConsumptions.weight}), 0)`.as("consumed_weight")
+    }).from(inkConsumptions).groupBy(inkConsumptions.materialCode).as("consumed");
+    return db.select({
+      materialCode: purchased.materialCode,
+      purchasedQty: purchased.purchasedQty,
+      purchasedWeight: purchased.purchasedWeight,
+      consumedQty: sql9`COALESCE(${consumed.consumedQty}, 0)`,
+      consumedWeight: sql9`COALESCE(${consumed.consumedWeight}, 0)`
+    }).from(purchased).leftJoin(consumed, eq16(purchased.materialCode, consumed.materialCode)).orderBy(purchased.materialCode);
+  }
+  /** Current balance weight for one material code (purchased − consumed). */
+  async balanceWeight(materialCode) {
+    const [row] = await db.select({
+      purchased: sql9`COALESCE((SELECT SUM(${inkPurchases.totalWeight}) FROM ${inkPurchases} WHERE ${inkPurchases.materialCode} = ${materialCode}), 0)`,
+      consumed: sql9`COALESCE((SELECT SUM(${inkConsumptions.weight}) FROM ${inkConsumptions} WHERE ${inkConsumptions.materialCode} = ${materialCode}), 0)`
+    }).from(sql9`(SELECT 1) AS one`);
+    return Number(row?.purchased ?? 0) - Number(row?.consumed ?? 0);
+  }
+  /** Consumption totals grouped by operator, for the operator-breakdown view. */
+  async consumptionByOperator() {
+    return db.select({
+      operatorId: inkConsumptions.operatorId,
+      operatorName: sql9`COALESCE(${inkConsumptions.operatorName}, ${operators.name}, 'Unassigned')`,
+      entries: sql9`COUNT(*)`,
+      totalQty: sql9`COALESCE(SUM(${inkConsumptions.qtyAssigned}), 0)`,
+      totalWeight: sql9`COALESCE(SUM(${inkConsumptions.weight}), 0)`
+    }).from(inkConsumptions).leftJoin(operators, eq16(inkConsumptions.operatorId, operators.id)).groupBy(inkConsumptions.operatorId, inkConsumptions.operatorName, operators.name).orderBy(sql9`SUM(${inkConsumptions.weight}) DESC`);
+  }
+};
+var inkRepository = new InkRepository();
+
+// src/api/services/ink.service.ts
+var dec = (n) => String(n);
+var InkService = class {
+  /* ---------------- Purchases ---------------- */
+  listPurchases() {
+    return inkRepository.listPurchases();
+  }
+  createPurchase(data) {
+    const totalWeight = data.quantity * data.weightPerQty;
+    return inkRepository.createPurchase({
+      reportDate: data.reportDate,
+      materialCode: data.materialCode,
+      vendor: data.vendor,
+      invoiceNumber: data.invoiceNumber ?? null,
+      quantity: dec(data.quantity),
+      weightPerQty: dec(data.weightPerQty),
+      totalWeight: dec(totalWeight)
+    });
+  }
+  async updatePurchase(id, data) {
+    const existing = await inkRepository.findPurchaseById(id);
+    if (!existing) throw new NotFoundError(Messages.notFound(Entity.INK_PURCHASE));
+    const quantity = data.quantity ?? Number(existing.quantity);
+    const weightPerQty = data.weightPerQty ?? Number(existing.weightPerQty);
+    return inkRepository.updatePurchase(id, {
+      ...data.reportDate !== void 0 && { reportDate: data.reportDate },
+      ...data.materialCode !== void 0 && { materialCode: data.materialCode },
+      ...data.vendor !== void 0 && { vendor: data.vendor },
+      ...data.invoiceNumber !== void 0 && { invoiceNumber: data.invoiceNumber || null },
+      quantity: dec(quantity),
+      weightPerQty: dec(weightPerQty),
+      totalWeight: dec(quantity * weightPerQty)
+    });
+  }
+  async removePurchase(id) {
+    const existing = await inkRepository.findPurchaseById(id);
+    if (!existing) throw new NotFoundError(Messages.notFound(Entity.INK_PURCHASE));
+    await inkRepository.removePurchase(id);
+  }
+  /* ---------------- Stock ---------------- */
+  async stock() {
+    const rows = await inkRepository.stockLevels();
+    return rows.map((r) => {
+      const purchasedQty = Number(r.purchasedQty);
+      const purchasedWeight = Number(r.purchasedWeight);
+      const consumedQty = Number(r.consumedQty);
+      const consumedWeight = Number(r.consumedWeight);
+      return {
+        materialCode: r.materialCode,
+        purchasedQty,
+        purchasedWeight,
+        consumedQty,
+        consumedWeight,
+        balanceQty: purchasedQty - consumedQty,
+        balanceWeight: purchasedWeight - consumedWeight
+      };
+    });
+  }
+  /* ---------------- Consumptions ---------------- */
+  listConsumptions() {
+    return inkRepository.listConsumptions();
+  }
+  consumptionByOperator() {
+    return inkRepository.consumptionByOperator();
+  }
+  async createConsumption(data) {
+    const balance = await inkRepository.balanceWeight(data.materialCode);
+    if (data.weight > balance) {
+      throw new ApiError(
+        `Cannot consume ${data.weight} kg of ${data.materialCode}: only ${balance} kg in stock`,
+        400
+      );
+    }
+    let operatorName = data.operatorName?.trim() || null;
+    if (data.operatorId != null && !operatorName) {
+      const op = await operatorRepository.findById(data.operatorId);
+      operatorName = op?.name ?? null;
+    }
+    return inkRepository.createConsumption({
+      materialCode: data.materialCode,
+      qtyAssigned: dec(data.qtyAssigned),
+      operatorId: data.operatorId ?? null,
+      operatorName,
+      weight: dec(data.weight),
+      note: data.note?.trim() || null
+    });
+  }
+  async removeConsumption(id) {
+    const removed = await inkRepository.removeConsumption(id);
+    if (!removed) throw new NotFoundError(Messages.notFound(Entity.INK_CONSUMPTION));
+  }
+};
+var inkService = new InkService();
+
+// src/api/controllers/ink.controller.ts
+var InkController = class {
+  /* Purchases */
+  listPurchases = asyncHandler(async (_req, res) => {
+    res.json({ data: await inkService.listPurchases() });
+  });
+  createPurchase = asyncHandler(async (req, res) => {
+    const input = req.validatedBody ?? req.body;
+    res.status(201).json({ data: await inkService.createPurchase(input) });
+  });
+  updatePurchase = asyncHandler(async (req, res) => {
+    const { id } = req.validatedParams ?? req.params;
+    const input = req.validatedBody ?? req.body;
+    res.json({ data: await inkService.updatePurchase(Number(id), input) });
+  });
+  removePurchase = asyncHandler(async (req, res) => {
+    const { id } = req.validatedParams ?? req.params;
+    await inkService.removePurchase(Number(id));
+    res.status(204).send();
+  });
+  /* Stock (derived) */
+  stock = asyncHandler(async (_req, res) => {
+    res.json({ data: await inkService.stock() });
+  });
+  /* Consumptions */
+  listConsumptions = asyncHandler(async (_req, res) => {
+    res.json({ data: await inkService.listConsumptions() });
+  });
+  byOperator = asyncHandler(async (_req, res) => {
+    res.json({ data: await inkService.consumptionByOperator() });
+  });
+  createConsumption = asyncHandler(async (req, res) => {
+    const input = req.validatedBody ?? req.body;
+    res.status(201).json({ data: await inkService.createConsumption(input) });
+  });
+  removeConsumption = asyncHandler(async (req, res) => {
+    const { id } = req.validatedParams ?? req.params;
+    await inkService.removeConsumption(Number(id));
+    res.status(204).send();
+  });
+};
+var inkController = new InkController();
+
+// src/api/validations/ink.validation.ts
+import { z as z22 } from "zod";
+var createInkPurchaseSchema = z22.object({
+  body: z22.object({
+    reportDate: z22.string().min(1, "Report date is required"),
+    materialCode: z22.string().trim().min(1, "Material code is required"),
+    vendor: z22.string().trim().min(1, "Vendor is required"),
+    invoiceNumber: z22.string().trim().optional(),
+    quantity: z22.coerce.number().positive("Quantity must be greater than 0"),
+    weightPerQty: z22.coerce.number().positive("Weight per quantity must be greater than 0")
+  })
+});
+var updateInkPurchaseSchema = z22.object({
+  body: z22.object({
+    reportDate: z22.string().min(1).optional(),
+    materialCode: z22.string().trim().min(1).optional(),
+    vendor: z22.string().trim().min(1).optional(),
+    invoiceNumber: z22.string().trim().optional(),
+    quantity: z22.coerce.number().positive().optional(),
+    weightPerQty: z22.coerce.number().positive().optional()
+  })
+});
+var createInkConsumptionSchema = z22.object({
+  body: z22.object({
+    materialCode: z22.string().trim().min(1, "Material code is required"),
+    qtyAssigned: z22.coerce.number().positive("Quantity assigned must be greater than 0"),
+    operatorId: z22.coerce.number().int().positive().optional(),
+    operatorName: z22.string().trim().optional(),
+    weight: z22.coerce.number().positive("Weight must be greater than 0"),
+    note: z22.string().trim().optional()
+  })
+});
+
+// src/api/routes/ink.routes.ts
+var router17 = Router18();
+router17.get("/purchases", inkController.listPurchases);
+router17.post("/purchases", validateRequest(createInkPurchaseSchema), inkController.createPurchase);
+router17.put(
+  "/purchases/:id",
+  validateParams(idParamsSchema),
+  validateRequest(updateInkPurchaseSchema),
+  inkController.updatePurchase
+);
+router17.delete("/purchases/:id", validateParams(idParamsSchema), inkController.removePurchase);
+router17.get("/stock", inkController.stock);
+router17.get("/consumptions", inkController.listConsumptions);
+router17.get("/consumptions/by-operator", inkController.byOperator);
+router17.post("/consumptions", validateRequest(createInkConsumptionSchema), inkController.createConsumption);
+router17.delete("/consumptions/:id", validateParams(idParamsSchema), inkController.removeConsumption);
+var ink_routes_default = router17;
+
 // src/api/routes/analytics.routes.ts
-import { Router as Router15 } from "express";
+import { Router as Router19 } from "express";
 
 // src/api/repositories/analytics.repository.ts
-import { eq as eq12, sql as sql8 } from "drizzle-orm";
+import { eq as eq17, sql as sql10 } from "drizzle-orm";
 var AnalyticsRepository = class {
   async countWorkOrders() {
-    const [row] = await db.select({ value: sql8`count(*)` }).from(workOrders);
+    const [row] = await db.select({ value: sql10`count(*)` }).from(workOrders);
     return Number(row?.value ?? 0);
   }
   /** Work orders still in production (not yet completed/dispatched). */
   async countSubmittedWorkOrders() {
-    const [row] = await db.select({ value: sql8`count(*)` }).from(workOrders).where(eq12(workOrders.status, "initiate_production"));
+    const [row] = await db.select({ value: sql10`count(*)` }).from(workOrders).where(eq17(workOrders.status, "initiate_production"));
     return Number(row?.value ?? 0);
   }
   /* Production counts are per label-type line on a production order. A line is complete
      when every planned roll has been packaged. */
   async countProductionProgress() {
-    const [row] = await db.select({ value: sql8`count(*)` }).from(productionOrderLines);
+    const [row] = await db.select({ value: sql10`count(*)` }).from(productionOrderLines);
     return Number(row?.value ?? 0);
   }
   async countActiveProductionProgress() {
-    const [row] = await db.select({ value: sql8`count(*)` }).from(productionOrderLines).where(sql8`cast(${productionOrderLines.packagedRolls} as numeric) < cast(${productionOrderLines.totalRolls} as numeric)`);
+    const [row] = await db.select({ value: sql10`count(*)` }).from(productionOrderLines).where(sql10`cast(${productionOrderLines.packagedRolls} as numeric) < cast(${productionOrderLines.totalRolls} as numeric)`);
     return Number(row?.value ?? 0);
   }
   async countCompletedProductionProgress() {
-    const [row] = await db.select({ value: sql8`count(*)` }).from(productionOrderLines).where(
-      sql8`cast(${productionOrderLines.packagedRolls} as numeric) >= cast(${productionOrderLines.totalRolls} as numeric) AND cast(${productionOrderLines.totalRolls} as numeric) > 0`
+    const [row] = await db.select({ value: sql10`count(*)` }).from(productionOrderLines).where(
+      sql10`cast(${productionOrderLines.packagedRolls} as numeric) >= cast(${productionOrderLines.totalRolls} as numeric) AND cast(${productionOrderLines.totalRolls} as numeric) > 0`
     );
     return Number(row?.value ?? 0);
   }
   async countMaterials() {
-    const [row] = await db.select({ value: sql8`count(*)` }).from(materials);
+    const [row] = await db.select({ value: sql10`count(*)` }).from(materials);
     return Number(row?.value ?? 0);
   }
   async countLowStock() {
-    const [row] = await db.select({ value: sql8`count(*)` }).from(inventoryRolls).where(sql8`cast(${inventoryRolls.balanceRolls} as numeric) < 5`);
+    const [row] = await db.select({ value: sql10`count(*)` }).from(inventoryRolls).where(sql10`cast(${inventoryRolls.balanceRolls} as numeric) < 5`);
     return Number(row?.value ?? 0);
   }
   async sumBalanceRolls() {
-    const [row] = await db.select({ value: sql8`coalesce(sum(cast(${inventoryRolls.balanceRolls} as numeric)), 0)` }).from(inventoryRolls);
+    const [row] = await db.select({ value: sql10`coalesce(sum(cast(${inventoryRolls.balanceRolls} as numeric)), 0)` }).from(inventoryRolls);
     return Number(row?.value ?? 0);
   }
   async sumIssuedRolls() {
-    const [row] = await db.select({ value: sql8`coalesce(sum(cast(${inventoryRolls.issuedRolls} as numeric)), 0)` }).from(inventoryRolls);
+    const [row] = await db.select({ value: sql10`coalesce(sum(cast(${inventoryRolls.issuedRolls} as numeric)), 0)` }).from(inventoryRolls);
     return Number(row?.value ?? 0);
   }
 };
@@ -6468,27 +8250,33 @@ var AnalyticsController = class {
 var analyticsController = new AnalyticsController();
 
 // src/api/routes/analytics.routes.ts
-var router15 = Router15();
-router15.get("/kpis", analyticsController.getKpis);
-var analytics_routes_default = router15;
+var router18 = Router19();
+router18.get("/kpis", analyticsController.getKpis);
+var analytics_routes_default = router18;
 
 // src/api/routes/index.ts
-var router16 = Router16();
-router16.use("/", index_routes_default);
-router16.use("/health", health_routes_default);
-router16.use("/companies", companies_routes_default);
-router16.use("/brands", brands_routes_default);
-router16.use("/materials", materials_routes_default);
-router16.use("/machines", machines_routes_default);
-router16.use("/operators", operators_routes_default);
-router16.use("/users", users_routes_default);
-router16.use("/work-orders", work_orders_routes_default);
-router16.use("/production-orders", production_orders_routes_default);
-router16.use("/woven-production", woven_production_routes_default);
-router16.use("/inventory", inventory_routes_default);
-router16.use("/thread", thread_inventory_routes_default);
-router16.use("/analytics", analytics_routes_default);
-var routes_default = router16;
+var router19 = Router20();
+router19.use("/", index_routes_default);
+router19.use("/health", health_routes_default);
+router19.use("/companies", companies_routes_default);
+router19.use("/brands", brands_routes_default);
+router19.use("/materials/stickers", stickerMaterialsRouter);
+router19.use("/materials/local-sheets", localSheetsRouter);
+router19.use("/materials/label-sheets", labelSheetsRouter);
+router19.use("/materials", materials_routes_default);
+router19.use("/machines", machines_routes_default);
+router19.use("/operators", operators_routes_default);
+router19.use("/users", users_routes_default);
+router19.use("/work-orders", work_orders_routes_default);
+router19.use("/production-orders", production_orders_routes_default);
+router19.use("/woven-production", woven_production_routes_default);
+router19.use("/inventory", inventory_routes_default);
+router19.use("/thread", thread_inventory_routes_default);
+router19.use("/thread-service-providers", thread_service_provider_routes_default);
+router19.use("/thread-dyeing", thread_dyeing_routes_default);
+router19.use("/ink", ink_routes_default);
+router19.use("/analytics", analytics_routes_default);
+var routes_default = router19;
 
 // src/app.ts
 var app = express();

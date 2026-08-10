@@ -50,6 +50,7 @@ export class InventoryRollRepository {
     updatedAt: inventoryRolls.updatedAt,
     materialDescription: materials.description,
     materialType: materials.type,
+    weightPerRoll: materials.weightPerRoll,
   };
 
   async findAll(filters?: RollListFilters) {

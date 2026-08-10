@@ -9,12 +9,14 @@ import { logger } from "@config/logger";
 import { setupGracefulShutdown } from "@db/drizzle";
 import { migrateMachinesTable } from "@db/migrate-machines";
 import { migrateRemainingWeightColumns } from "@db/migrate-remaining-weight";
+import { migrateReconciliationColumns } from "@db/migrate-reconciliation-columns";
 
 const server = http.createServer(app);
 
 // Run non-blocking schema migrations
 migrateMachinesTable();
 migrateRemainingWeightColumns();
+migrateReconciliationColumns();
 
 server.listen(env.PORT, () => {
   logger.info(`Server running on port ${env.PORT} in ${env.NODE_ENV} mode`);

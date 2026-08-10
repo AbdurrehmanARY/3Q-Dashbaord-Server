@@ -5,11 +5,13 @@ import { operatorRepository } from "../repositories/operator.repository";
 import { materialRepository } from "../repositories/material.repository";
 import { inventoryRepository } from "../repositories/inventory.repository";
 import { userService } from "./user.service";
+import { mailService } from "./mail.service";
 import { ApiError, ConflictError, NotFoundError } from "../utils/ApiError";
 import {
   calculateRequiredRolls,
   calculateTotalRolls,
   calculateTotalWeight,
+  DEFAULT_ROLL_LENGTH_M,
 } from "../utils/production-formula";
 import { buildProductionOverviewBody } from "./production-order-overview.builder";
 import { Messages, Entity } from "../constants/messages";
@@ -19,6 +21,7 @@ import {
   RESOURCE_SLOTS,
   toNumbers,
   missingStartRequirements,
+  missingCuttingRequirements,
   cascadeChain,
   hasAnyProgress,
   deriveLineStatus,
@@ -185,10 +188,29 @@ export class ProductionOrderService {
     return `PRD-${String(next).padStart(5, "0")}`;
   }
 
-  async updateProductionOrder(id: number | string, data: { notes?: string }) {
-    await this.getOrderOrThrow(id);
-    const updated = await productionOrderRepository.update(id, data);
+  async updateProductionOrder(
+    id: number | string,
+    data: { notes?: string; status?: "planned" | "production" | "complete" }
+  ) {
+    const order = await this.getOrderOrThrow(id);
+    const patch: Partial<ProductionOrder> = {};
+    if (data.notes !== undefined) patch.notes = data.notes;
+    if (data.status !== undefined) {
+      patch.status = data.status;
+      if (data.status === "complete") {
+        patch.completedAt = order.completedAt ?? new Date();
+      } else {
+        patch.completedAt = null;
+      }
+    }
+
+    const updated = await productionOrderRepository.update(id, patch);
     if (!updated) throw new NotFoundError(Messages.notFound(Entity.PRODUCTION_ORDER));
+
+    if (data.status === "complete") {
+      await this.notifyIfOrderCompleted(Number(id), "complete");
+    }
+
     return updated;
   }
 
@@ -199,10 +221,6 @@ export class ProductionOrderService {
    */
   async deleteProductionOrder(id: number | string): Promise<void> {
     await this.getOrderOrThrow(id);
-    const lines = await productionOrderRepository.findLines(id);
-    if (lines.some(hasAnyProgress)) {
-      throw new ApiError("Cannot delete a production order that has recorded production progress", 400);
-    }
     await productionOrderRepository.releaseOrderInventoryTransaction(Number(id));
   }
 
@@ -241,12 +259,6 @@ export class ProductionOrderService {
   async updateLinePlan(lineId: number | string, input: PlanLineInput & { actorUserId?: number }) {
     const line = await this.getLineOrThrow(lineId);
     const order = await this.getOrderOrThrow(line.productionOrderId);
-    if (hasAnyProgress(line)) {
-      throw new ApiError(
-        `Cannot re-plan '${line.labelType}': production progress has already been recorded against it`,
-        400
-      );
-    }
     const actorUserId = await userService.assertActor(input.actorUserId);
 
     const siblings = (await productionOrderRepository.findLines(line.productionOrderId)).filter(
@@ -281,6 +293,20 @@ export class ProductionOrderService {
       line.productionOrderId,
       (lines) => deriveOrderPatch(lines, order)
     );
+  }
+
+  async reconcileLine(
+    lineId: number | string,
+    data: {
+      usedRolls: number;
+      usedWeight: number;
+      extraRollsReturned: number;
+      extraWeight: number;
+      actorUserId?: number | null;
+    }
+  ) {
+    await this.getLineOrThrow(lineId);
+    return productionOrderRepository.reconcileLineStockTransaction(Number(lineId), data);
   }
 
   /**
@@ -333,27 +359,32 @@ export class ProductionOrderService {
     const material = await materialRepository.findByCode(input.materialCode);
     if (!material) throw new NotFoundError(`Material with code '${input.materialCode}' not found`);
 
-    const assignedRolls = input.assignedRolls ?? 0;
-    if (assignedRolls < 0) {
+    const assignedRollsInput = input.assignedRolls ?? 0;
+    if (assignedRollsInput < 0) {
       throw new ApiError(`Assigned rolls for '${labelType}' cannot be negative`, 400);
     }
 
-    // Availability is read from the inventory ledger only — never recomputed from
-    // purchase records. Purchases credit that ledger; nothing else is stock.
-    if (assignedRolls > 0) {
-      const stock = await inventoryRepository.findInventoryRollByMaterialCode(input.materialCode);
-      if (!stock) throw new NotFoundError(`No inventory record for material '${input.materialCode}'`);
+    const rollLength = input.rollLength && input.rollLength > 0 ? input.rollLength : DEFAULT_ROLL_LENGTH_M;
+    const requiredRolls = calculateRequiredRolls(input.quantity, input.labelSize, rollLength);
+    const extraRolls = input.extraRolls ?? 0;
+    const calculatedTotalRolls = calculateTotalRolls(requiredRolls, extraRolls);
 
-      // Re-planning frees whatever this line is currently holding of the same material.
-      const releasing =
-        current && current.materialCode === input.materialCode ? Number(current.issuedRolls) : 0;
-      const available = Number(stock.balanceRolls) + releasing;
-      if (assignedRolls > available) {
-        throw new ApiError(
-          `Cannot assign ${assignedRolls} rolls of ${input.materialCode}: only ${available} available in inventory`,
-          400
-        );
-      }
+    const assignedRolls = assignedRollsInput > 0 ? assignedRollsInput : calculatedTotalRolls;
+    const totalRolls = assignedRolls;
+    const totalWeight = calculateTotalWeight(Number(material.weightPerRoll), totalRolls);
+
+    // Availability is read from the inventory stock ledger only — never recomputed from
+    // purchase records. Purchases credit that ledger; nothing else is stock.
+    const stock = await inventoryRepository.findInventoryRollByMaterialCode(input.materialCode);
+    const releasing =
+      current && current.materialCode === input.materialCode ? Number(current.issuedRolls) : 0;
+    const available = stock ? Number(stock.balanceRolls) + releasing : 0;
+
+    if (assignedRolls > available) {
+      throw new ApiError(
+        `Cannot assign ${assignedRolls} rolls of ${input.materialCode}: only ${available} available in inventory stock`,
+        400
+      );
     }
 
     // Only the line being re-planned is excluded. Sibling label types on this same order
@@ -365,15 +396,11 @@ export class ProductionOrderService {
       locks
     );
 
-    const requiredRolls = calculateRequiredRolls(input.quantity, input.labelSize);
-    const extraRolls = input.extraRolls ?? 0;
-    const totalRolls = calculateTotalRolls(requiredRolls, extraRolls);
-    const totalWeight = calculateTotalWeight(Number(material.weightPerRoll), totalRolls);
-
     return {
       labelType,
       quantity: String(input.quantity),
       labelSize: String(input.labelSize),
+      rollLength: String(rollLength),
       requiredRolls: String(requiredRolls),
       extraRolls: String(extraRolls),
       totalRolls: String(totalRolls),
@@ -480,7 +507,7 @@ export class ProductionOrderService {
       );
     }
 
-    return productionOrderRepository.applyLineChangeTransaction(
+    const updatedLine = await productionOrderRepository.applyLineChangeTransaction(
       Number(lineId),
       // Computed against the locked row so a concurrent edit to this line can't be lost.
       (freshLine) => {
@@ -499,6 +526,13 @@ export class ProductionOrderService {
           requested.printedRolls = input.completed;
         } else if (stage === "cutting") {
           previousValue = n.cutRolls;
+          const missingCut = missingCuttingRequirements(freshLine);
+          if (missingCut.length > 0) {
+            throw new ApiError(
+              `Cutting progress cannot be recorded on '${freshLine.labelType}' until a ${missingCut.join(" and ")} ${missingCut.length > 1 ? "are" : "is"} assigned`,
+              400
+            );
+          }
           if (input.completed > n.sentToCuttingRolls) {
             throw new ApiError(
               `Cut rolls (${input.completed}) cannot exceed the ${n.sentToCuttingRolls} sent to cutting`,
@@ -557,6 +591,8 @@ export class ProductionOrderService {
       },
       (lines) => deriveOrderPatch(lines, order)
     );
+    await this.notifyIfOrderCompleted(line.productionOrderId, order.status);
+    return updatedLine;
   }
 
   /* ============ Phases 5 & 7: Manual stage transfers ============ */
@@ -578,7 +614,7 @@ export class ProductionOrderService {
       throw new ApiError("Transfer quantity must be greater than zero", 400);
     }
 
-    return productionOrderRepository.applyLineChangeTransaction(
+    const updatedLine = await productionOrderRepository.applyLineChangeTransaction(
       Number(lineId),
       // The delta is applied to the locked row's current total, so two concurrent transfers
       // add up instead of one overwriting the other.
@@ -591,6 +627,13 @@ export class ProductionOrderService {
         if (input.target === "cutting") {
           previousValue = n.sentToCuttingRolls;
           newValue = previousValue + input.rolls;
+          const missingCut = missingCuttingRequirements(freshLine);
+          if (missingCut.length > 0) {
+            throw new ApiError(
+              `Cannot send rolls to cutting on '${freshLine.labelType}' until a ${missingCut.join(" and ")} ${missingCut.length > 1 ? "are" : "is"} assigned`,
+              400
+            );
+          }
           if (newValue > n.printedRolls) {
             const available = n.printedRolls - previousValue;
             throw new ApiError(
@@ -631,6 +674,8 @@ export class ProductionOrderService {
       },
       (lines) => deriveOrderPatch(lines, order)
     );
+    await this.notifyIfOrderCompleted(line.productionOrderId, order.status);
+    return updatedLine;
   }
 
   /* ============ Inline row editing (Production Progress table) ============ */
@@ -667,6 +712,7 @@ export class ProductionOrderService {
       cuttingMachineId?: number | null;
       cuttingOperatorId?: number | null;
       packagingOperatorId?: number | null;
+      status?: ProductionOrderLine["status"];
       note?: string;
       actorUserId?: number;
     }
@@ -700,6 +746,30 @@ export class ProductionOrderService {
           `Production cannot start on '${line.labelType}' until a ${missing.join(", ")} ${missing.length > 1 ? "are" : "is"} assigned`,
           400
         );
+      }
+
+      const effectiveCuttingMachine =
+        input.cuttingMachineId !== undefined ? input.cuttingMachineId : line.cuttingMachineId;
+      const effectiveCuttingOperator =
+        input.cuttingOperatorId !== undefined ? input.cuttingOperatorId : line.cuttingOperatorId;
+
+      const isCuttingActive =
+        (input.sentToCuttingRolls !== undefined && input.sentToCuttingRolls > 0) ||
+        (input.cutRolls !== undefined && input.cutRolls > 0) ||
+        Number(line.sentToCuttingRolls) > 0 ||
+        Number(line.cutRolls) > 0;
+
+      if (isCuttingActive) {
+        const missingCut = missingCuttingRequirements({
+          cuttingMachineId: effectiveCuttingMachine,
+          cuttingOperatorId: effectiveCuttingOperator,
+        });
+        if (missingCut.length > 0) {
+          throw new ApiError(
+            `Cutting cannot proceed on '${line.labelType}' until a ${missingCut.join(" and ")} ${missingCut.length > 1 ? "are" : "is"} assigned`,
+            400
+          );
+        }
       }
     }
 
@@ -794,18 +864,19 @@ export class ProductionOrderService {
       if (input.cuttingMachineId !== undefined) patch.cuttingMachineId = input.cuttingMachineId;
       if (input.cuttingOperatorId !== undefined) patch.cuttingOperatorId = input.cuttingOperatorId;
       if (input.packagingOperatorId !== undefined) patch.packagingOperatorId = input.packagingOperatorId;
+      if (input.status !== undefined) patch.status = input.status;
       return patch;
     };
 
     // Nothing actually changes vs. the current row → no write, no audit event (as before).
     if (Object.keys(buildRowPatch(line)).length === 0) return line;
 
-    return productionOrderRepository.applyLineChangeTransaction(
+    const updatedLine = await productionOrderRepository.applyLineChangeTransaction(
       Number(lineId),
       (freshLine) => {
         const patch = buildRowPatch(freshLine);
         const mergedLine = { ...freshLine, ...patch } as ProductionOrderLine;
-        patch.status = deriveLineStatus(mergedLine);
+        patch.status = input.status ?? deriveLineStatus(mergedLine);
         // Record who/when each stage finished — the traceability record for the order.
         Object.assign(patch, stageCompletionPatch(mergedLine));
         return {
@@ -819,6 +890,8 @@ export class ProductionOrderService {
       },
       (lines) => deriveOrderPatch(lines, order)
     );
+    await this.notifyIfOrderCompleted(line.productionOrderId, order.status);
+    return updatedLine;
   }
 
   /* ============ Material issuance from inventory ============ */
@@ -961,6 +1034,30 @@ export class ProductionOrderService {
       lines,
       totals,
     };
+  }
+
+  private async notifyIfOrderCompleted(productionOrderId: number, previousStatus: string) {
+    if (previousStatus === "complete") return;
+    try {
+      const updatedOrder = await productionOrderRepository.findById(productionOrderId);
+      if (updatedOrder && updatedOrder.status === "complete") {
+        mailService
+          .sendProductionCompletedEmail({
+            productionNumber: updatedOrder.productionNumber,
+            soNumber: updatedOrder.soNumber,
+            poNumber: updatedOrder.poNumber,
+            companyName: updatedOrder.companyName,
+            brandName: updatedOrder.brandName,
+            totalQty: updatedOrder.totalQty,
+            completedAt: updatedOrder.completedAt,
+          })
+          .catch((err) => {
+            console.error("[ProductionOrderService] Error sending completion email:", err);
+          });
+      }
+    } catch (err) {
+      console.error("[ProductionOrderService] Failed to check completion status for email notification:", err);
+    }
   }
 }
 

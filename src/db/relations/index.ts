@@ -18,6 +18,13 @@ import { wovenThreadPlanItems } from "../tables/woven-thread-plan-items.table";
 import { threadStocks } from "../tables/thread-stocks.table";
 import { threadDyeBatches } from "../tables/thread-dye-batches.table";
 import { threadStockMovements } from "../tables/thread-stock-movements.table";
+import { productionRuns } from "../tables/production-runs.table";
+import { threadServiceProviders } from "../tables/thread-service-providers.table";
+import {
+  threadDyeingSends,
+  threadDyeingAllocations,
+  threadDyeingReceives,
+} from "../tables/thread-dyeing-workflow.table";
 
 export const companiesRelations = relations(companies, ({ many }) => ({
   brands: many(brands),
@@ -249,12 +256,63 @@ export const threadDyeBatchesRelations = relations(threadDyeBatches, ({ one }) =
   }),
 }));
 
+/* ==================== Append-only production runs ==================== */
+
+export const productionRunsRelations = relations(productionRuns, ({ one }) => ({
+  saleOrder: one(workOrders, {
+    fields: [productionRuns.saleOrderId],
+    references: [workOrders.id],
+  }),
+  machine: one(machines, {
+    fields: [productionRuns.machineId],
+    references: [machines.id],
+  }),
+  operator: one(operators, {
+    fields: [productionRuns.operatorId],
+    references: [operators.id],
+  }),
+  createdBy: one(users, {
+    fields: [productionRuns.createdBy],
+    references: [users.id],
+  }),
+}));
+
+/* ==================== Thread dyeing service-provider workflow ==================== */
+
+export const threadServiceProvidersRelations = relations(threadServiceProviders, ({ many }) => ({
+  sends: many(threadDyeingSends),
+}));
+
+export const threadDyeingSendsRelations = relations(threadDyeingSends, ({ one, many }) => ({
+  serviceProvider: one(threadServiceProviders, {
+    fields: [threadDyeingSends.serviceProviderId],
+    references: [threadServiceProviders.id],
+  }),
+  allocations: many(threadDyeingAllocations),
+  receives: many(threadDyeingReceives),
+}));
+
+export const threadDyeingAllocationsRelations = relations(threadDyeingAllocations, ({ one }) => ({
+  send: one(threadDyeingSends, {
+    fields: [threadDyeingAllocations.threadDyeingSendId],
+    references: [threadDyeingSends.id],
+  }),
+}));
+
+export const threadDyeingReceivesRelations = relations(threadDyeingReceives, ({ one }) => ({
+  send: one(threadDyeingSends, {
+    fields: [threadDyeingReceives.threadDyeingSendId],
+    references: [threadDyeingSends.id],
+  }),
+}));
+
 export const operatorsRelations = relations(operators, ({ one, many }) => ({
   machines: many(machines),
   user: one(users, {
     fields: [operators.userId],
     references: [users.id],
   }),
+  productionRuns: many(productionRuns),
   wovenWeavingLines: many(wovenProductionLines, { relationName: "wovenWeavingOperator" }),
   wovenCuttingLines: many(wovenProductionLines, { relationName: "wovenCuttingOperator" }),
   wovenPackagingLines: many(wovenProductionLines, { relationName: "wovenPackagingOperator" }),

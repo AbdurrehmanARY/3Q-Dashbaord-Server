@@ -17,6 +17,8 @@ const workOrderWithBrandSelect = {
   totalQty: workOrders.totalQty,
   brandId: workOrders.brandId,
   comment: workOrders.comment,
+  priority: workOrders.priority,
+  orderType: workOrders.orderType,
   imageUrl: workOrders.imageUrl,
   status: workOrders.status,
   productType: workOrders.productType,
@@ -35,6 +37,7 @@ const workOrderWithBrandSelect = {
   repeat: wovenWorkOrderDetails.repeat,
   density: wovenWorkOrderDetails.density,
   extra: wovenWorkOrderDetails.extra,
+  sizeLabels: wovenWorkOrderDetails.sizeLabels,
 };
 
 export class WorkOrderRepository {

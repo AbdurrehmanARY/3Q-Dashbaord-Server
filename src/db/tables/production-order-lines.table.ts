@@ -76,6 +76,13 @@ export const productionOrderLines = pgTable(
     cuttingCompletedAt: timestamp("cutting_completed_at"),
     packagingCompletedAt: timestamp("packaging_completed_at"),
 
+    /* --- Stock Reconciliation after completion --- */
+    usedRolls: decimal("used_rolls", { precision: 10, scale: 2 }).default("0").notNull(),
+    usedWeight: decimal("used_weight", { precision: 14, scale: 4 }).default("0").notNull(),
+    extraRollsReturned: decimal("extra_rolls_returned", { precision: 10, scale: 2 }).default("0").notNull(),
+    extraWeight: decimal("extra_weight", { precision: 14, scale: 4 }).default("0").notNull(),
+    reconciledAt: timestamp("reconciled_at"),
+
     status: productionStatusEnum("status").default("pending").notNull(),
     notes: text("notes"),
     createdAt: timestamp("created_at").defaultNow().notNull(),

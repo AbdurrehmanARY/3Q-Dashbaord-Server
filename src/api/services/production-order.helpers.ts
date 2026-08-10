@@ -7,6 +7,8 @@ export interface PlanLineInput {
   labelType: string;
   quantity: number;
   labelSize: number;
+  /** Roll length in metres (100 / 200 / 400 …). Defaults to 200 when omitted. */
+  rollLength?: number;
   extraRolls?: number;
   materialCode?: string;
   /** Rolls the manager hands to this label type — drawn from inventory on save. */
@@ -53,6 +55,16 @@ export function missingStartRequirements(line: ProductionOrderLine): string[] {
   if (!line.materialCode) missing.push("material");
   if (line.printingMachineId == null) missing.push("printing machine");
   if (line.printingOperatorId == null) missing.push("printing operator");
+  return missing;
+}
+
+/**
+  * Cutting cannot proceed until the line has a cutting machine and cutting operator assigned.
+  */
+export function missingCuttingRequirements(line: { cuttingMachineId?: number | null; cuttingOperatorId?: number | null }): string[] {
+  const missing: string[] = [];
+  if (line.cuttingMachineId == null) missing.push("cutting machine");
+  if (line.cuttingOperatorId == null) missing.push("cutting operator");
   return missing;
 }
 
@@ -122,8 +134,7 @@ export function hasAnyProgress(line: ProductionOrderLine): boolean {
 
 /**
  * A line is `completed` once every planned roll is packaged, `active` once any progress
- * exists, else `pending`. (The `production_status` enum still carries paused/cancelled,
- * but the workflow no longer uses them.)
+ * exists, else `pending`.
  */
 export function deriveLineStatus(line: ProductionOrderLine): ProductionOrderLine["status"] {
   const n = toNumbers(line);
@@ -132,8 +143,8 @@ export function deriveLineStatus(line: ProductionOrderLine): ProductionOrderLine
 }
 
 /**
- * The three automatic production-order states, derived purely from roll progress:
- *   complete   — every label type fully packaged
+ * The production-order states:
+ *   complete   — set manually by user via "Mark as Complete" button
  *   production — any label type has started
  *   planned    — nothing produced yet (incl. an order with no lines)
  */
@@ -141,21 +152,24 @@ export function deriveOrderPatch(
   lines: ProductionOrderLine[],
   current: ProductionOrder
 ): Partial<ProductionOrder> {
+  // If the user manually set order status to complete, keep it complete.
+  if (current.status === "complete") {
+    return {
+      status: "complete",
+      plannedAt: current.plannedAt ?? new Date(),
+      completedAt: current.completedAt ?? new Date(),
+    };
+  }
+
   // No lines yet: back to a clean "planned" with no timestamps.
   if (lines.length === 0) return { status: "planned", plannedAt: null, completedAt: null };
 
-  // Once the order has any label types it has been planned — stamp `plannedAt` the first
-  // time (and preserve it thereafter) rather than leaving the column permanently null.
   const plannedAt = current.plannedAt ?? new Date();
+  const anyStarted = lines.some(hasAnyProgress);
 
-  const allComplete = lines.every((l) => {
-    const n = toNumbers(l);
-    return n.totalRolls > 0 && n.packagedRolls >= n.totalRolls;
-  });
-  if (allComplete) {
-    return { status: "complete", plannedAt, completedAt: current.completedAt ?? new Date() };
-  }
-
-  const anyProgress = lines.some(hasAnyProgress);
-  return { status: anyProgress ? "production" : "planned", plannedAt, completedAt: null };
+  return {
+    status: anyStarted ? "production" : "planned",
+    plannedAt,
+    completedAt: null,
+  };
 }

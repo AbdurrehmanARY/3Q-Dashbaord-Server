@@ -2,6 +2,7 @@ import { workOrderRepository } from "../repositories/work-order.repository";
 import { productionOrderRepository } from "../repositories/production-order.repository";
 import { ApiError, ConflictError, NotFoundError } from "../utils/ApiError";
 import { Messages, Entity } from "../constants/messages";
+import { mailService } from "./mail.service";
 
 /**
  * Sales orders are a commercial header only — SO/PO number, dates, brand and a total
@@ -44,6 +45,8 @@ export class WorkOrderService {
     totalQty: number;
     brandId?: number;
     comment?: string;
+    priority?: string;
+    orderType?: string;
     /** Artwork / reference image URL. Blank clears it. */
     imageUrl?: string;
     productType?: "printed" | "woven";
@@ -53,6 +56,7 @@ export class WorkOrderService {
       repeat: number;
       density: number;
       extra?: number;
+      sizeLabels?: string[];
     };
   }) {
     const existing = await workOrderRepository.findAll({ soNumber: data.soNumber });
@@ -68,6 +72,8 @@ export class WorkOrderService {
       totalQty: data.totalQty,
       brandId: data.brandId,
       comment: data.comment,
+      priority: data.priority ?? "normal",
+      orderType: data.orderType ?? "normal order",
       imageUrl: data.imageUrl?.trim() ? data.imageUrl.trim() : null,
     };
 
@@ -87,6 +93,7 @@ export class WorkOrderService {
         // Decimal columns take strings through Drizzle.
         repeat: String(data.wovenDetail.repeat),
         extra: String(data.wovenDetail.extra ?? 0),
+        sizeLabels: data.wovenDetail.sizeLabels ?? [],
       });
     }
 
@@ -113,6 +120,7 @@ export class WorkOrderService {
       fbrInvoiceNumber: string;
       dispatchedDate: string;
       dispatchedQty: number;
+      imageUrl?: string;
     }
   ) {
     const existing = await workOrderRepository.findRawById(id);
@@ -131,15 +139,30 @@ export class WorkOrderService {
       );
     }
 
-    return workOrderRepository.update(id, {
+    const updated = await workOrderRepository.update(id, {
       dcNumber: data.dcNumber,
       lcNumber: data.lcNumber,
       fbrInvoiceNumber: data.fbrInvoiceNumber,
       dispatchedDate: data.dispatchedDate,
       dispatchedQty: data.dispatchedQty,
+      ...(data.imageUrl !== undefined ? { imageUrl: data.imageUrl } : {}),
       // Paperwork complete — this is the only place the status becomes `dispatched`.
       status: "dispatched",
     });
+
+    const productionOrder = await productionOrderRepository.findByWorkOrderId(id);
+    mailService
+      .sendProductionCompletedEmail({
+        productionNumber: productionOrder?.productionNumber || `SO-${existing.soNumber}`,
+        soNumber: existing.soNumber,
+        poNumber: existing.poNumber,
+        totalQty: existing.totalQty,
+      })
+      .catch((err) => {
+        console.error("[WorkOrderService] Error sending dispatch email:", err);
+      });
+
+    return updated;
   }
 
   /**
@@ -157,13 +180,15 @@ export class WorkOrderService {
     totalQty?: number;
     brandId?: number;
     comment?: string;
+    priority?: string;
+    orderType?: string;
     imageUrl?: string;
     dcNumber?: string;
     lcNumber?: string;
     fbrInvoiceNumber?: string;
     dispatchedDate?: string;
     dispatchedQty?: number;
-    wovenDetail?: { designCode?: string; pick?: number; repeat?: number; density?: number; extra?: number };
+    wovenDetail?: { designCode?: string; pick?: number; repeat?: number; density?: number; extra?: number; sizeLabels?: string[] };
   }) {
     const existing = await workOrderRepository.findRawById(id);
     if (!existing) throw new NotFoundError(Messages.notFound(Entity.WORK_ORDER));
@@ -178,22 +203,9 @@ export class WorkOrderService {
       ...commercial
     } = data;
 
-    // Production has handed over: the commercial header locks, but the dispatch paperwork
-    // stays editable so the office can fill in DC / LC / FBR invoice.
-    const productionFinished = existing.status === "complete" || existing.status === "dispatched";
-    if (productionFinished && Object.keys(commercial).length > 0) {
-      throw new ApiError(
-        "This work order is finished — only the dispatch paperwork (DC number, LC number, FBR invoice, date, quantity) can still be edited",
-        400
-      );
-    }
-
     if (wovenDetail && Object.keys(wovenDetail).length > 0) {
       if (existing.productType !== "woven") {
         throw new ApiError("Only a woven work order carries a design specification", 400);
-      }
-      if (productionFinished) {
-        throw new ApiError("This work order is finished — its design specification is locked", 400);
       }
       // A renamed design code still has to stay unique across the facility.
       if (wovenDetail.designCode) {
@@ -208,18 +220,8 @@ export class WorkOrderService {
         ...(wovenDetail.density !== undefined ? { density: wovenDetail.density } : {}),
         ...(wovenDetail.repeat !== undefined ? { repeat: String(wovenDetail.repeat) } : {}),
         ...(wovenDetail.extra !== undefined ? { extra: String(wovenDetail.extra) } : {}),
+        ...(wovenDetail.sizeLabels !== undefined ? { sizeLabels: wovenDetail.sizeLabels } : {}),
       });
-    }
-
-    // Once a production order exists, the quantity it was raised against is fixed.
-    if (data.totalQty !== undefined && data.totalQty !== existing.totalQty) {
-      const productionOrder = await productionOrderRepository.findByWorkOrderId(id);
-      if (productionOrder) {
-        throw new ApiError(
-          `Cannot change quantity: production order ${productionOrder.productionNumber} was raised against this work order`,
-          400
-        );
-      }
     }
 
     return workOrderRepository.update(id, {
@@ -235,18 +237,11 @@ export class WorkOrderService {
   async deleteWorkOrder(id: number | string): Promise<void> {
     const existing = await workOrderRepository.findRawById(id);
     if (!existing) throw new NotFoundError(Messages.notFound(Entity.WORK_ORDER));
-    if (existing.status !== "initiate_production") {
-      throw new ApiError("Cannot delete a work order that is already in production", 400);
-    }
 
-    // `production_orders.work_order_id` is ON DELETE RESTRICT — surface that as a clear
-    // 400 rather than letting the FK violation surface as a 500.
+    // Delete linked production order first if any exists so FK restriction doesn't block
     const productionOrder = await productionOrderRepository.findByWorkOrderId(id);
     if (productionOrder) {
-      throw new ApiError(
-        `Cannot delete this sales order: production order ${productionOrder.productionNumber} was raised against it`,
-        400
-      );
+      await productionOrderRepository.releaseOrderInventoryTransaction(Number(productionOrder.id));
     }
 
     await workOrderRepository.delete(id);
