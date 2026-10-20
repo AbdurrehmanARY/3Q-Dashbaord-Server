@@ -4,7 +4,7 @@ import { defineConfig } from "drizzle-kit";
 // `dotenv/config` guarantees DATABASE_URL is loaded from .env when drizzle-kit runs
 // (db:generate / db:migrate / db:push), independent of its own env-loading behaviour.
 export default defineConfig({
-  schema: "./src/db/schema.ts",
+  schema: "./src/shared/db/schema.ts",
   out: "./drizzle",
   dialect: "postgresql",
   dbCredentials: {

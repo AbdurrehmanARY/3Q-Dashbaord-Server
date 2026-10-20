@@ -10,6 +10,7 @@ import { setupGracefulShutdown } from "@db/drizzle";
 import { migrateMachinesTable } from "@db/migrate-machines";
 import { migrateRemainingWeightColumns } from "@db/migrate-remaining-weight";
 import { migrateReconciliationColumns } from "@db/migrate-reconciliation-columns";
+import { migrateSpeedColumn } from "@db/migrate-speed-column";
 
 const server = http.createServer(app);
 
@@ -17,6 +18,7 @@ const server = http.createServer(app);
 migrateMachinesTable();
 migrateRemainingWeightColumns();
 migrateReconciliationColumns();
+migrateSpeedColumn();
 
 server.listen(env.PORT, () => {
   logger.info(`Server running on port ${env.PORT} in ${env.NODE_ENV} mode`);

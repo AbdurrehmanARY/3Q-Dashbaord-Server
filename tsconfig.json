@@ -17,11 +17,12 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "baseUrl": ".",
+        "baseUrl": ".",
     "paths": {
-      "@db/*": ["./src/db/*"],
-      "@config/*": ["./src/config/*"],
-      "@api/*": ["./src/api/*"]
+            "@db/*": ["./src/shared/db/*"],
+      "@config/*": ["./src/shared/config/*"],
+      "@shared/*": ["./src/shared/*"],
+      "@modules/*": ["./src/modules/*"]
     }
   },
   "include": ["src/**/*"],

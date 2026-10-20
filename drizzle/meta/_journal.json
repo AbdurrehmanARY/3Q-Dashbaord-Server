@@ -127,6 +127,83 @@
       "when": 1786012393450,
       "tag": "0017_glorious_captain_america",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1786525712441,
+      "tag": "0018_batch_material_flow",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1786533923814,
+      "tag": "0019_batch_flow_sync",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1786539498229,
+      "tag": "0020_woven_batch_stage",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1786539499206,
+      "tag": "0021_woven_batch_flow",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1787100000000,
+      "tag": "0022_label_kinds_and_sizes",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1787150000000,
+      "tag": "0023_revert_cutting_packaging_line_scope",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1787200000000,
+      "tag": "0024_woven_estimated_weaving_hours",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1787250000000,
+      "tag": "0025_line_scoped_cutting_packaging",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1787300000000,
+      "tag": "0026_label_types",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1787350000000,
+      "tag": "0027_waste_all_stages",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1787360000000,
+      "tag": "0028_dispatch_dc_image",
+      "breakpoints": true
     }
   ]
 }
